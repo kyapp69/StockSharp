@@ -16,13 +16,11 @@ Copyright 2010 by StockSharp, LLC
 namespace StockSharp.Messages
 {
 	using System;
-	using System.ComponentModel;
 	using System.ComponentModel.DataAnnotations;
 	using System.Linq;
 	using System.Runtime.Serialization;
 
 	using Ecng.Common;
-	using Ecng.Collections;
 	using Ecng.Serialization;
 
 	using StockSharp.Localization;
@@ -66,7 +64,7 @@ namespace StockSharp.Messages
 		/// Average price.
 		/// </summary>
 		[EnumMember]
-		[Display(ResourceType = typeof(LocalizedStrings), Name = LocalizedStrings.Str257Key)]
+		[Display(ResourceType = typeof(LocalizedStrings), Name = LocalizedStrings.AveragePriceKey)]
 		AveragePrice,
 
 		/// <summary>
@@ -168,6 +166,55 @@ namespace StockSharp.Messages
 		[EnumMember]
 		[Display(ResourceType = typeof(LocalizedStrings), Name = LocalizedStrings.Str312Key)]
 		SettlementPrice,
+
+		/// <summary>
+		/// Orders (bids).
+		/// </summary>
+		[EnumMember]
+		[Display(ResourceType = typeof(LocalizedStrings), Name = LocalizedStrings.OrdersBidsKey)]
+		BuyOrdersCount,
+		
+		/// <summary>
+		/// Orders (asks).
+		/// </summary>
+		[EnumMember]
+		[Display(ResourceType = typeof(LocalizedStrings), Name = LocalizedStrings.OrdersAsksKey)]
+		SellOrdersCount,
+		
+		/// <summary>
+		/// Margin (buy).
+		/// </summary>
+		[EnumMember]
+		[Display(ResourceType = typeof(LocalizedStrings), Name = LocalizedStrings.Str304Key)]
+		BuyOrdersMargin,
+		
+		/// <summary>
+		/// Margin (sell).
+		/// </summary>
+		[EnumMember]
+		[Display(ResourceType = typeof(LocalizedStrings), Name = LocalizedStrings.Str305Key)]
+		SellOrdersMargin,
+		
+		/// <summary>
+		/// Orders (margin).
+		/// </summary>
+		[EnumMember]
+		[Display(ResourceType = typeof(LocalizedStrings), Name = LocalizedStrings.OrdersMarginKey)]
+		OrdersMargin,
+
+		/// <summary>
+		/// Orders.
+		/// </summary>
+		[EnumMember]
+		[Display(ResourceType = typeof(LocalizedStrings), Name = LocalizedStrings.Str668Key)]
+		OrdersCount,
+
+		/// <summary>
+		/// Trades.
+		/// </summary>
+		[EnumMember]
+		[Display(ResourceType = typeof(LocalizedStrings), Name = LocalizedStrings.Str985Key)]
+		TradesCount,
 	}
 
 	/// <summary>
@@ -177,25 +224,14 @@ namespace StockSharp.Messages
 	[Serializable]
 	[DisplayNameLoc(LocalizedStrings.Str862Key)]
 	[DescriptionLoc(LocalizedStrings.PositionDescKey)]
-	public sealed class PositionChangeMessage : BaseChangeMessage<PositionChangeTypes>
+	public class PositionChangeMessage : BaseChangeMessage<PositionChangeMessage,
+		PositionChangeTypes>, IPortfolioNameMessage, ISecurityIdMessage, IStrategyIdMessage
 	{
-		/// <summary>
-		/// Security ID.
-		/// </summary>
+		/// <inheritdoc />
 		[DataMember]
-		[DisplayNameLoc(LocalizedStrings.SecurityIdKey)]
-		[DescriptionLoc(LocalizedStrings.SecurityIdKey, true)]
+		[DisplayNameLoc(LocalizedStrings.NameKey)]
+		[DescriptionLoc(LocalizedStrings.Str247Key)]
 		[MainCategory]
-		public SecurityId SecurityId { get; set; }
-
-		/// <summary>
-		/// Portfolio name.
-		/// </summary>
-		[DataMember]
-		[DisplayNameLoc(LocalizedStrings.PortfolioKey)]
-		[DescriptionLoc(LocalizedStrings.PortfolioNameKey)]
-		[MainCategory]
-		[ReadOnly(true)]
 		public string PortfolioName { get; set; }
 
 		/// <summary>
@@ -206,6 +242,13 @@ namespace StockSharp.Messages
 		[DisplayNameLoc(LocalizedStrings.ClientCodeKey)]
 		[DescriptionLoc(LocalizedStrings.ClientCodeDescKey)]
 		public string ClientCode { get; set; }
+
+		/// <inheritdoc />
+		[DataMember]
+		[DisplayNameLoc(LocalizedStrings.SecurityIdKey)]
+		[DescriptionLoc(LocalizedStrings.SecurityIdKey, true)]
+		[MainCategory]
+		public SecurityId SecurityId { get; set; }
 
 		/// <summary>
 		/// The depositary where the physical security.
@@ -234,18 +277,43 @@ namespace StockSharp.Messages
 		public string Description { get; set; }
 
 		/// <summary>
-		/// ID of the original message <see cref="PortfolioMessage.TransactionId"/> for which this message is a response.
+		/// Electronic board code.
 		/// </summary>
 		[DataMember]
-		public long OriginalTransactionId { get; set; }
+		[DisplayNameLoc(LocalizedStrings.BoardKey)]
+		[DescriptionLoc(LocalizedStrings.BoardCodeKey, true)]
+		[MainCategory]
+		public string BoardCode { get; set; }
+
+		/// <inheritdoc />
+		[DataMember]
+		public string StrategyId { get; set; }
+
+		/// <summary>
+		/// Side.
+		/// </summary>
+		[DataMember]
+		public Sides? Side { get; set; }
 
 		/// <summary>
 		/// Initializes a new instance of the <see cref="PositionChangeMessage"/>.
 		/// </summary>
 		public PositionChangeMessage()
-			: base(MessageTypes.PositionChange)
+			: this(MessageTypes.PositionChange)
 		{
 		}
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="PositionChangeMessage"/>.
+		/// </summary>
+		/// <param name="type">Message type.</param>
+		protected PositionChangeMessage(MessageTypes type)
+			: base(type)
+		{
+		}
+
+		/// <inheritdoc />
+		public override DataType DataType => DataType.PositionChanges;
 
 		/// <summary>
 		/// Create a copy of <see cref="PositionChangeMessage"/>.
@@ -253,32 +321,44 @@ namespace StockSharp.Messages
 		/// <returns>Copy.</returns>
 		public override Message Clone()
 		{
-			var msg = new PositionChangeMessage
-			{
-				LocalTime = LocalTime,
-				PortfolioName = PortfolioName,
-				SecurityId = SecurityId,
-				DepoName = DepoName,
-				ServerTime = ServerTime,
-				LimitType = LimitType,
-				Description = Description,
-				OriginalTransactionId = OriginalTransactionId,
-				ClientCode = ClientCode,
-			};
+			var clone = new PositionChangeMessage();
 
-			msg.Changes.AddRange(Changes);
-			this.CopyExtensionInfo(msg);
+			CopyTo(clone);
 
-			return msg;
+			return clone;
 		}
 
-		/// <summary>
-		/// Returns a string that represents the current object.
-		/// </summary>
-		/// <returns>A string that represents the current object.</returns>
+		/// <inheritdoc />
+		public override void CopyTo(PositionChangeMessage destination)
+		{
+			base.CopyTo(destination);
+
+			destination.SecurityId = SecurityId;
+			destination.DepoName = DepoName;
+			destination.LimitType = LimitType;
+			destination.Description = Description;
+			destination.PortfolioName = PortfolioName;
+			destination.ClientCode = ClientCode;
+			destination.BoardCode = BoardCode;
+			destination.StrategyId = StrategyId;
+			destination.Side = Side;
+		}
+
+		/// <inheritdoc />
 		public override string ToString()
 		{
-			return base.ToString() + $",Sec={SecurityId},P={PortfolioName},CL={ClientCode},Changes={Changes.Select(c => c.ToString()).Join(",")}";
+			var str = base.ToString() + $",Sec={SecurityId},P={PortfolioName},CL={ClientCode},L={LimitType},Changes={Changes.Select(c => c.ToString()).JoinComma()}";
+
+			if (!StrategyId.IsEmpty())
+				str += $",Strategy={StrategyId}";
+
+			if (!Description.IsEmpty())
+				str += $",Description={Description}";
+
+			if (Side != null)
+				str += $",Side={Side}";
+
+			return str;
 		}
 	}
 }

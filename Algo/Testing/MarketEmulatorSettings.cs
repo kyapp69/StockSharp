@@ -57,7 +57,7 @@ namespace StockSharp.Algo.Testing
 					return;
 
 				_matchOnTouch = value;
-				NotifyChanged(nameof(MatchOnTouch));
+				NotifyChanged();
 			}
 		}
 
@@ -81,7 +81,7 @@ namespace StockSharp.Algo.Testing
 					return;
 
 				_depthExpirationTime = value;
-				NotifyChanged(nameof(DepthExpirationTime));
+				NotifyChanged();
 			}
 		}
 
@@ -108,7 +108,7 @@ namespace StockSharp.Algo.Testing
 					throw new ArgumentOutOfRangeException(nameof(value), value, LocalizedStrings.Str1183);
 
 				_failing = value;
-				NotifyChanged(nameof(Failing));
+				NotifyChanged();
 			}
 		}
 
@@ -132,7 +132,7 @@ namespace StockSharp.Algo.Testing
 					throw new ArgumentOutOfRangeException(nameof(value), value, LocalizedStrings.Str1185);
 
 				_latency = value;
-				NotifyChanged(nameof(Latency));
+				NotifyChanged();
 			}
 		}
 
@@ -153,7 +153,7 @@ namespace StockSharp.Algo.Testing
 			set
 			{
 				_isSupportAtomicReRegister = value;
-				NotifyChanged(nameof(_isSupportAtomicReRegister));
+				NotifyChanged();
 			}
 		}
 
@@ -177,33 +177,9 @@ namespace StockSharp.Algo.Testing
 					throw new ArgumentOutOfRangeException(nameof(value), value, LocalizedStrings.Str940);
 
 				_bufferTime = value;
-				NotifyChanged(nameof(BufferTime));
+				NotifyChanged();
 			}
 		}
-
-		//private TimeSpan? _useCandlesTimeFrame;
-
-		///// <summary>
-		///// Использовать свечи с заданным тайм-фреймом. Если тайм-фрейм равен <see langword="null"/>, свечи не используются.
-		///// </summary>
-		//[CategoryLoc(LocalizedStrings.Str1174Key)]
-		//[PropertyOrder(10)]
-		//[DisplayNameLoc(LocalizedStrings.CandlesKey)]
-		//[DescriptionLoc(LocalizedStrings.Str1188Key)]
-		//[Nullable]
-		//[DefaultValue(typeof(TimeSpan), "00:05:00")]
-		//public TimeSpan? UseCandlesTimeFrame
-		//{
-		//	get { return _useCandlesTimeFrame; }
-		//	set
-		//	{
-		//		if (value <= TimeSpan.Zero)
-		//			throw new ArgumentOutOfRangeException(nameof(value), value, LocalizedStrings.Str1189);
-
-		//		_useCandlesTimeFrame = value;
-		//		NotifyChanged(nameof(UseCandlesTimeFrame));
-		//	}
-		//}
 
 		private long _initialOrderId;
 
@@ -222,7 +198,7 @@ namespace StockSharp.Algo.Testing
 			set
 			{
 				_initialOrderId = value;
-				NotifyChanged(nameof(InitialOrderId));
+				NotifyChanged();
 			}
 		}
 
@@ -243,7 +219,7 @@ namespace StockSharp.Algo.Testing
 			set
 			{
 				_initialTradeId = value;
-				NotifyChanged(nameof(InitialTradeId));
+				NotifyChanged();
 			}
 		}
 
@@ -264,7 +240,7 @@ namespace StockSharp.Algo.Testing
 			set
 			{
 				_initialTransactionId = value;
-				NotifyChanged(nameof(InitialTransactionId));
+				NotifyChanged();
 			}
 		}
 
@@ -285,10 +261,10 @@ namespace StockSharp.Algo.Testing
 			set
 			{
 				if (value < 1)
-					throw new ArgumentOutOfRangeException();
+					throw new ArgumentOutOfRangeException(nameof(value), value, LocalizedStrings.Str1219);
 
 				_spreadSize = value;
-				NotifyChanged(nameof(SpreadSize));
+				NotifyChanged();
 			}
 		}
 
@@ -309,10 +285,10 @@ namespace StockSharp.Algo.Testing
 			set
 			{
 				if (value < 1)
-					throw new ArgumentOutOfRangeException();
+					throw new ArgumentOutOfRangeException(nameof(value), value, LocalizedStrings.Str1219);
 
 				_maxDepth = value;
-				NotifyChanged(nameof(MaxDepth));
+				NotifyChanged();
 			}
 		}
 
@@ -333,10 +309,10 @@ namespace StockSharp.Algo.Testing
 			set
 			{
 				if (value < 0)
-					throw new ArgumentOutOfRangeException();
+					throw new ArgumentOutOfRangeException(nameof(value), value, LocalizedStrings.Str1219);
 
 				_volumeMultiplier = value;
-				NotifyChanged(nameof(VolumeMultiplier));
+				NotifyChanged();
 			}
 		}
 
@@ -360,7 +336,7 @@ namespace StockSharp.Algo.Testing
 					throw new ArgumentOutOfRangeException(nameof(value), value, LocalizedStrings.Str940);
 
 				_portfolioRecalcInterval = value;
-				NotifyChanged(nameof(PortfolioRecalcInterval));
+				NotifyChanged();
 			}
 		}
 
@@ -381,7 +357,7 @@ namespace StockSharp.Algo.Testing
 			set
 			{
 				_convertTime = value;
-				NotifyChanged(nameof(ConvertTime));
+				NotifyChanged();
 			}
 		}
 
@@ -402,7 +378,7 @@ namespace StockSharp.Algo.Testing
 			set
 			{
 				_timeZone = value;
-				NotifyChanged(nameof(TimeZone));
+				NotifyChanged();
 			}
 		}
 
@@ -422,10 +398,8 @@ namespace StockSharp.Algo.Testing
 			get => _priceLimitOffset;
 			set
 			{
-				if (value == null)
-					throw new ArgumentNullException(nameof(value));
-
-				_priceLimitOffset = value;
+				_priceLimitOffset = value ?? throw new ArgumentNullException(nameof(value));
+				NotifyChanged();
 			}
 		}
 
@@ -446,7 +420,7 @@ namespace StockSharp.Algo.Testing
 			set
 			{
 				_increaseDepthVolume = value;
-				NotifyChanged(nameof(IncreaseDepthVolume));
+				NotifyChanged();
 			}
 		}
 
@@ -467,7 +441,7 @@ namespace StockSharp.Algo.Testing
 			set
 			{
 				_checkTradingState = value;
-				NotifyChanged(nameof(CheckTradingState));
+				NotifyChanged();
 			}
 		}
 
@@ -488,9 +462,31 @@ namespace StockSharp.Algo.Testing
 			set
 			{
 				_checkMoney = value;
-				NotifyChanged(nameof(CheckMoney));
+				NotifyChanged();
 			}
 		}
+
+		/// <summary>
+		/// Can have short positions.
+		/// </summary>
+		[Display(
+			ResourceType = typeof(LocalizedStrings),
+			Name = LocalizedStrings.ShortableKey,
+			Description = LocalizedStrings.ShortableDescKey,
+			GroupName = LocalizedStrings.Str1175Key,
+			Order = 218)]
+		public bool CheckShortable { get; set; }
+
+		/// <summary>
+		/// Allow store generated by <see cref="IMarketEmulator"/> messages.
+		/// </summary>
+		[Display(
+			ResourceType = typeof(LocalizedStrings),
+			Name = LocalizedStrings.Str1405Key,
+			//Description = ,
+			GroupName = LocalizedStrings.Str1175Key,
+			Order = 219)]
+		public bool AllowStoreGenerateMessages { get; set; }
 
 		/// <summary>
 		/// To save the state of paper trading parameters.
@@ -517,6 +513,8 @@ namespace StockSharp.Algo.Testing
 			storage.SetValue(nameof(IncreaseDepthVolume), IncreaseDepthVolume);
 			storage.SetValue(nameof(CheckTradingState), CheckTradingState);
 			storage.SetValue(nameof(CheckMoney), CheckMoney);
+			storage.SetValue(nameof(CheckShortable), CheckShortable);
+			storage.SetValue(nameof(AllowStoreGenerateMessages), AllowStoreGenerateMessages);
 
 			if (TimeZone != null)
 				storage.SetValue(nameof(TimeZone), TimeZone);
@@ -547,6 +545,8 @@ namespace StockSharp.Algo.Testing
 			IncreaseDepthVolume = storage.GetValue(nameof(IncreaseDepthVolume), IncreaseDepthVolume);
 			CheckTradingState = storage.GetValue(nameof(CheckTradingState), CheckTradingState);
 			CheckMoney = storage.GetValue(nameof(CheckMoney), CheckMoney);
+			CheckShortable = storage.GetValue(nameof(CheckShortable), CheckShortable);
+			AllowStoreGenerateMessages = storage.GetValue(nameof(AllowStoreGenerateMessages), AllowStoreGenerateMessages);
 
 			if (storage.Contains(nameof(TimeZone)))
 				TimeZone = storage.GetValue<TimeZoneInfo>(nameof(TimeZone));

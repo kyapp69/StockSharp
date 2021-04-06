@@ -1,5 +1,6 @@
 ﻿namespace StockSharp.Algo
 {
+	using StockSharp.Algo.Storages.Remote.Messages;
 	using StockSharp.Algo.Strategies.Messages;
 	using StockSharp.Algo.Testing;
 	using StockSharp.Messages;
@@ -9,12 +10,15 @@
 	/// </summary>
 	public static class ExtendedMessageTypes
 	{
-		internal const MessageTypes Last = (MessageTypes)(-1);
+		///// <summary>
+		///// The last message identifier.
+		///// </summary>
+		//public const MessageTypes Last = (MessageTypes)(-1);
 
-		/// <summary>
-		/// <see cref="ClearingMessage"/>.
-		/// </summary>
-		public const MessageTypes Clearing = (MessageTypes)(-2);
+		///// <summary>
+		///// <see cref="ClearingMessage"/>.
+		///// </summary>
+		//public const MessageTypes Clearing = (MessageTypes)(-2);
 
 		/// <summary>
 		/// <see cref="EmulationStateMessage"/>.
@@ -37,25 +41,20 @@
 		public const MessageTypes HistorySource = (MessageTypes)(-8);
 		
 		internal const MessageTypes RemoveSecurity = (MessageTypes)(-9);
-		internal const MessageTypes ProcessSuspendedSecurityMessages = (MessageTypes)(-10);
+		//internal const MessageTypes ProcessSuspended = (MessageTypes)(-10);
 		internal const MessageTypes StrategyChangeState = (MessageTypes)(-11);
 		internal const MessageTypes Reconnect = (MessageTypes)(-12);
-		internal const MessageTypes RestoringSubscription = (MessageTypes)(-13);
+		internal const MessageTypes ReconnectingFinished = (MessageTypes)(-13);
 		
 		/// <summary>
 		/// <see cref="ChangeTimeIntervalMessage"/>.
 		/// </summary>
 		public const MessageTypes ChangeTimeInterval = (MessageTypes)(-14);
 
-		/// <summary>
-		/// <see cref="StrategyLookupMessage"/>.
-		/// </summary>
-		public const MessageTypes StrategyLookup = (MessageTypes)(-15);
-
-		/// <summary>
-		/// <see cref="StrategyLookupResultMessage"/>.
-		/// </summary>
-		public const MessageTypes StrategyLookupResult = (MessageTypes)(-16);
+		///// <summary>
+		///// <see cref="StrategyLookupMessage"/>.
+		///// </summary>
+		//public const MessageTypes StrategyLookup = (MessageTypes)(-15);
 
 		/// <summary>
 		/// <see cref="StrategyInfoMessage"/>.
@@ -71,5 +70,44 @@
 		/// <see cref="StrategyStateMessage"/>.
 		/// </summary>
 		public const MessageTypes StrategyState = (MessageTypes)(-19);
+
+		internal const MessageTypes ReconnectingStarted = (MessageTypes)(-20);
+
+		internal const MessageTypes PartialDownload = (MessageTypes)(-21);
+
+		/// <summary>
+		/// <see cref="RemoteFileMessage"/>.
+		/// </summary>
+		public const MessageTypes RemoteFile = (MessageTypes)(-22);
+
+		/// <summary>
+		/// <see cref="RemoteFileCommandMessage"/>.
+		/// </summary>
+		public const MessageTypes RemoteFileCommand = (MessageTypes)(-23);
+
+		/// <summary>
+		/// <see cref="StrategySubscriptionInfoMessage"/>.
+		/// </summary>
+		public const MessageTypes StrategySubscriptionInfo = (MessageTypes)(-24);
+
+		/// <summary>
+		/// <see cref="StrategyBacktestResultMessage"/>.
+		/// </summary>
+		public const MessageTypes StrategyBacktestResult = (MessageTypes)(-25);
+
+		/// <summary>
+		/// <see cref="SubscriptionSecurityAllMessage"/>.
+		/// </summary>
+		public const MessageTypes SubscriptionSecurityAll = (MessageTypes)(-26);
+
+		/// <summary>
+		/// <see cref="AvailableDataRequestMessage"/>.
+		/// </summary>
+		public const MessageTypes AvailableDataRequest = (MessageTypes)(-27);
+
+		/// <summary>
+		/// <see cref="AvailableDataInfoMessage"/>.
+		/// </summary>
+		public const MessageTypes AvailableDataInfo = (MessageTypes)(-28);
 	}
 }

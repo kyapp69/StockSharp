@@ -17,8 +17,8 @@ using StockSharp.Localization;
 [assembly: AssemblyCopyright(ProjectDescriptions.Copyright)]
 [assembly: AssemblyTrademark(ProjectDescriptions.Trademark)]
 [assembly: AssemblyCulture("")]
-#if DEBUG
 
+#if DEBUG
 [assembly: AssemblyConfiguration("Debug")]
 #else
 [assembly: AssemblyConfiguration("Release")]
@@ -26,7 +26,9 @@ using StockSharp.Localization;
 
 //[assembly: AllowPartiallyTrustedCallers]
 
+#if !CLS_DISABLE
 [assembly: CLSCompliant(true)]
+#endif
 [assembly: NeutralResourcesLanguage("en-US")]
 
 // Setting ComVisible to false makes the types in this assembly not visible 

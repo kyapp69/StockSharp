@@ -1,116 +1,144 @@
 namespace StockSharp.Community
 {
 	using System;
+	using System.Collections.Generic;
+	using System.IO;
 	using System.Linq;
 
 	using Ecng.Common;
+	using Ecng.Security;
 
-	using StockSharp.Localization;
-
-	static class Extensions
+	/// <summary>
+	/// Extensions for <see cref="Community"/>.
+	/// </summary>
+	public static class Extensions
 	{
-		public static ErrorCodes ToErrorCode(this Guid sessionId)
+		/// <summary>
+		/// S#.API
+		/// </summary>
+		public static readonly ProductInfoMessage Api = new ProductInfoMessage { Id = 5, Name = "S#.API", PackageId = "StockSharp.Samples" };
+
+		/// <summary>
+		/// S#.Data
+		/// </summary>
+		public static readonly ProductInfoMessage Hydra = new ProductInfoMessage { Id = 8, Name = "S#.Data", PackageId = "StockSharp.Hydra" };
+
+		/// <summary>
+		/// S#.Terminal
+		/// </summary>
+		public static readonly ProductInfoMessage Terminal = new ProductInfoMessage { Id = 10, Name = "S#.Terminal", PackageId = "StockSharp.Terminal" };
+
+		/// <summary>
+		/// S#.Designer
+		/// </summary>
+		public static readonly ProductInfoMessage Designer = new ProductInfoMessage { Id = 9, Name = "S#.Designer", PackageId = "StockSharp.Designer" };
+
+		/// <summary>
+		/// S#.Installer
+		/// </summary>
+		public static readonly ProductInfoMessage Installer = new ProductInfoMessage { Id = 16, Name = "S#.Installer", PackageId = "StockSharp.Installer.UI" };
+
+		/// <summary>
+		/// S#.Edu
+		/// </summary>
+		public static readonly ProductInfoMessage Edu = new ProductInfoMessage { Id = 83, Name = "S#.Edu", PackageId = "StockSharp.Lessons" };
+
+		/// <summary>
+		/// S#.Server
+		/// </summary>
+		public static readonly ProductInfoMessage Server = new ProductInfoMessage { Id = 14, Name = "S#.Server", PackageId = "StockSharp.Server" };
+
+		/// <summary>
+		/// S#.LicenseTool
+		/// </summary>
+		public static readonly ProductInfoMessage LicenseTool = new ProductInfoMessage { Id = 194, Name = "S#.LicenseTool", PackageId = "StockSharp.LicenseTool" };
+
+		/// <summary>
+		/// S#.Terminal (mobile).
+		/// </summary>
+		public static readonly ProductInfoMessage TerminalMobile = new ProductInfoMessage { Id = 199, Name = "S#.Terminal (mobile)", PackageId = "StockSharp.Mobile.Terminal" };
+
+		[Obsolete]
+		private static readonly Dictionary<Products, ProductInfoMessage> _productsMapping = new Dictionary<Products, ProductInfoMessage>
 		{
-			if (sessionId == Guid.Empty)
-				return ErrorCodes.UnknownServerError;
+			{ Products.Api, Api },
+			{ Products.Hydra, Hydra },
+			{ Products.Designer, Designer },
+			{ Products.Terminal, Terminal },
+			{ Products.Shell, new ProductInfoMessage { Id = 11, Name = "S#.Shell", PackageId = "StockSharp.Shell" } },
+			{ Products.MatLab, new ProductInfoMessage { Id = 12, Name = "S#.MatLab", PackageId = "StockSharp.MatLab" } },
+			{ Products.Lci, new ProductInfoMessage { Id = 13, Name = "S#.Ë×È", PackageId = "StockSharp.LciViewer" } },
+			{ Products.Server, Server },
+			{ Products.Installer, Installer },
+		};
 
-			var bytes = sessionId.ToByteArray();
+		/// <summary>
+		/// Convert <see cref="ProductInfoMessage"/> to <see cref="Products"/> value.
+		/// </summary>
+		/// <param name="product"><see cref="ProductInfoMessage"/> value.</param>
+		/// <returns><see cref="Products"/> value.</returns>
+		[Obsolete]
+		public static Products ToEnum(this ProductInfoMessage product)
+		{
+			if (product == null)
+				throw new ArgumentNullException(nameof(product));
 
-			if (bytes.Take(14).All(b => b == 0))
-				return (ErrorCodes)bytes[15];
-
-			return ErrorCodes.Ok;
+			return _productsMapping.First(p => p.Value.Id == product.Id).Key;
 		}
 
-		public static void ThrowIfError(this ErrorCodes code, params object[] args)
+		/// <summary>
+		/// Convert <see cref="Products"/> to <see cref="ProductInfoMessage"/> value.
+		/// </summary>
+		/// <param name="product"><see cref="Products"/> value.</param>
+		/// <returns><see cref="ProductInfoMessage"/> value.</returns>
+		[Obsolete]
+		public static ProductInfoMessage FromEnum(this Products product)
 		{
-			switch (code)
+			return _productsMapping[product];
+		}
+
+		/// <summary>
+		/// Get product's public name.
+		/// </summary>
+		/// <param name="product">Product.</param>
+		/// <returns>Public name.</returns>
+		public static string GetPublicName(this ProductInfoMessage product)
+		{
+			if (product == null)
+				throw new ArgumentNullException(nameof(product));
+
+			var name = product.Name.Remove("S#.", true);
+
+			if (name.CompareIgnoreCase("Data"))
+				name = "Hydra";
+
+			return name;
+		}
+
+		/// <summary>
+		/// Get file list and their hashes in the specified folder.
+		/// </summary>
+		/// <param name="path">Path to the folder.</param>
+		/// <returns>File list.</returns>
+		public static Tuple<string, string>[] GetLocalFiles(string path)
+		{
+			var localFiles = Directory.GetFiles(path, "*.*", SearchOption.AllDirectories);
+			return localFiles.Select(f =>
 			{
-				case ErrorCodes.Ok:
-					return;
-				case ErrorCodes.UnknownServerError:
-					throw new InvalidOperationException(LocalizedStrings.UnknownServerError);
+				var name = f.Remove(path);
 
-				// auth error codes
-				case ErrorCodes.InvalidCredentials:
-					throw new InvalidOperationException(LocalizedStrings.WrongLoginOrPassword);
-				case ErrorCodes.ClientNotExist:
-					throw new InvalidOperationException(LocalizedStrings.AccountNotFound);
-				case ErrorCodes.SessionNotExist:
-					throw new InvalidOperationException(LocalizedStrings.SessionExpired);
-				case ErrorCodes.TimeOut:
-					throw new InvalidOperationException(LocalizedStrings.Str24);
-				case ErrorCodes.Locked:
-					throw new InvalidOperationException(LocalizedStrings.UserBlocked);
+				if (name[0] == '\\')
+					name = name.Substring(1);
 
-				// reg error codes
-				case ErrorCodes.InvalidEmail:
-					throw new InvalidOperationException(LocalizedStrings.EmailIncorrect);
-				case ErrorCodes.InvalidLogin:
-					throw new InvalidOperationException(LocalizedStrings.LoginIncorrect);
-				case ErrorCodes.InvalidPhone:
-					throw new InvalidOperationException(LocalizedStrings.PhoneIncorrect);
-				case ErrorCodes.InvalidPassword:
-					throw new InvalidOperationException(LocalizedStrings.PasswordNotCriteria);
-				case ErrorCodes.DuplicateEmail:
-					throw new InvalidOperationException(LocalizedStrings.EmailAlreadyUse);
-				case ErrorCodes.DuplicatePhone:
-					throw new InvalidOperationException(LocalizedStrings.PhoneAlreadyUse);
-				case ErrorCodes.DuplicateLogin:
-					throw new InvalidOperationException(LocalizedStrings.LoginAlreadyUse);
-				case ErrorCodes.InvalidEmailCode:
-					throw new InvalidOperationException(LocalizedStrings.IncorrectVerificationCode);
-				case ErrorCodes.InvalidSmsCode:
-					throw new InvalidOperationException(LocalizedStrings.IncorrectSmsCode);
-
-				// notify error codes
-				case ErrorCodes.SmsNotEnought:
-					throw new InvalidOperationException(LocalizedStrings.SmsNotEnough);
-				case ErrorCodes.EmailNotEnought:
-					throw new InvalidOperationException(LocalizedStrings.EmailNotEnough);
-				case ErrorCodes.PhoneNotExist:
-					throw new InvalidOperationException(LocalizedStrings.PhoneNotSpecified);
-				
-				// license error codes
-				case ErrorCodes.LicenseRejected:
-					throw new InvalidOperationException(LocalizedStrings.LicenseRevoked);
-				case ErrorCodes.LicenseMaxRenew:
-					throw new InvalidOperationException(LocalizedStrings.LicenseMaxRenew);
-				case ErrorCodes.ClientNotApproved:
-					throw new InvalidOperationException(LocalizedStrings.SmsActivationFailed);
-				case ErrorCodes.TooMuchFrequency:
-					throw new InvalidOperationException(LocalizedStrings.MaxLicensePerMin);
-
-				case ErrorCodes.StrategyRemoved:
-					throw new InvalidOperationException(LocalizedStrings.StrategyRemoved.Put(args));
-				case ErrorCodes.StrategyNotExist:
-					throw new InvalidOperationException(LocalizedStrings.StrategyNotExist.Put(args));
-				case ErrorCodes.StrategyPriceTypeCannotChange:
-					throw new InvalidOperationException(LocalizedStrings.StrategyPriceTypeCannotChange.Put(args));
-				case ErrorCodes.StrategyContentTypeCannotChange:
-					throw new InvalidOperationException(LocalizedStrings.StrategyContentTypeCannotChange.Put(args));
-				case ErrorCodes.StrategyOwnSubscribe:
-					throw new InvalidOperationException(LocalizedStrings.OwnStrategySubscription);
-				case ErrorCodes.TooMuchPrice:
-					throw new InvalidOperationException(LocalizedStrings.TooMuchPrice);
-				case ErrorCodes.NotEnoughBalance:
-					throw new InvalidOperationException(LocalizedStrings.NotEnoughBalance.Put(args));
-				case ErrorCodes.NotSubscribed:
-					throw new InvalidOperationException(LocalizedStrings.NotSubscribed.Put(args));
-				case ErrorCodes.CurrencyCannotChange:
-					throw new InvalidOperationException(LocalizedStrings.CurrencyCannotChange);
-				case ErrorCodes.NotCompleteRegistered:
-					throw new InvalidOperationException(LocalizedStrings.NotCompleteRegistered);
-
-				case ErrorCodes.FileNotStarted:
-					throw new InvalidOperationException(LocalizedStrings.FileNotStarted);
-				case ErrorCodes.FileTooMuch:
-					throw new InvalidOperationException(LocalizedStrings.FileTooMuch);
-				case ErrorCodes.FileNotExist:
-					throw new InvalidOperationException(LocalizedStrings.Str1575);
-				default:
-					throw new InvalidOperationException(LocalizedStrings.UnknownServerErrorCode.Put(code));
-			}
+				return Tuple.Create(name, File.ReadAllBytes(f).Hash());
+			}).ToArray();
 		}
+
+		/// <summary>
+		/// Get hash for the specified input.
+		/// </summary>
+		/// <param name="input">Input.</param>
+		/// <returns>File hash.</returns>
+		public static string Hash(this byte[] input) => input.Md5();
 	}
 }

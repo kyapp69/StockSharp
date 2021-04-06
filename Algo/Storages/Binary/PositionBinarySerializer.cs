@@ -28,6 +28,7 @@ namespace StockSharp.Algo.Storages.Binary
 			Leverage = new RefPair<decimal, decimal>();
 			Commission = new RefPair<decimal, decimal>();
 			CurrentValueInLots = new RefPair<decimal, decimal>();
+			SettlementPrice = new RefPair<decimal, decimal>();
 			
 			Portfolios = new List<string>();
 			ClientCodes = new List<string>();
@@ -45,7 +46,8 @@ namespace StockSharp.Algo.Storages.Binary
 		public RefPair<decimal, decimal> Leverage { get; private set; }
 		public RefPair<decimal, decimal> Commission { get; private set; }
 		public RefPair<decimal, decimal> CurrentValueInLots { get; private set; }
-		
+		public RefPair<decimal, decimal> SettlementPrice { get; private set; }
+
 		public IList<string> Portfolios { get; }
 		public IList<string> ClientCodes { get; }
 		public IList<string> DepoNames { get; }
@@ -69,20 +71,25 @@ namespace StockSharp.Algo.Storages.Binary
 			Write(stream, Commission);
 			Write(stream, CurrentValueInLots);
 			
-			stream.Write(Portfolios.Count);
+			stream.WriteEx(Portfolios.Count);
 
 			foreach (var portfolio in Portfolios)
-				stream.Write(portfolio);
+				stream.WriteEx(portfolio);
 
-			stream.Write(ClientCodes.Count);
+			stream.WriteEx(ClientCodes.Count);
 
 			foreach (var clientCode in ClientCodes)
-				stream.Write(clientCode);
+				stream.WriteEx(clientCode);
 
-			stream.Write(DepoNames.Count);
+			stream.WriteEx(DepoNames.Count);
 
 			foreach (var depoName in DepoNames)
-				stream.Write(depoName);
+				stream.WriteEx(depoName);
+
+			if (Version < MarketDataVersions.Version33)
+				return;
+
+			Write(stream, SettlementPrice);
 		}
 
 		public override void Read(Stream stream)
@@ -115,12 +122,17 @@ namespace StockSharp.Algo.Storages.Binary
 
 			for (var i = 0; i < dnCount; i++)
 				DepoNames.Add(stream.Read<string>());
+
+			if (Version < MarketDataVersions.Version33)
+				return;
+
+			SettlementPrice = ReadInfo(stream);
 		}
 
 		private static void Write(Stream stream, RefPair<decimal, decimal> info)
 		{
-			stream.Write(info.First);
-			stream.Write(info.Second);
+			stream.WriteEx(info.First);
+			stream.WriteEx(info.Second);
 		}
 
 		private static RefPair<decimal, decimal> ReadInfo(Stream stream)
@@ -154,6 +166,8 @@ namespace StockSharp.Algo.Storages.Binary
 
 			DepoNames.Clear();
 			DepoNames.AddRange(posInfo.DepoNames);
+
+			SettlementPrice = Clone(posInfo.SettlementPrice);
 		}
 
 		private static RefPair<decimal, decimal> Clone(RefPair<decimal, decimal> info)
@@ -165,7 +179,7 @@ namespace StockSharp.Algo.Storages.Binary
 	class PositionBinarySerializer : BinaryMarketDataSerializer<PositionChangeMessage, PositionMetaInfo>
 	{
 		public PositionBinarySerializer(SecurityId securityId, IExchangeInfoProvider exchangeInfoProvider)
-			: base(securityId, 20, MarketDataVersions.Version31, exchangeInfoProvider)
+			: base(securityId, null, 20, MarketDataVersions.Version36, exchangeInfoProvider)
 		{
 		}
 
@@ -179,6 +193,9 @@ namespace StockSharp.Algo.Storages.Binary
 			}
 
 			writer.WriteInt(messages.Count());
+
+			var buildFrom = metaInfo.Version >= MarketDataVersions.Version35;
+			var side = metaInfo.Version >= MarketDataVersions.Version36;
 
 			foreach (var message in messages)
 			{
@@ -280,10 +297,42 @@ namespace StockSharp.Algo.Storages.Binary
 						case PositionChangeTypes.ExpirationDate:
 							writer.WriteDto((DateTimeOffset)change.Value);
 							break;
+						case PositionChangeTypes.CommissionMaker:
+						case PositionChangeTypes.CommissionTaker:
+						case PositionChangeTypes.BuyOrdersMargin:
+						case PositionChangeTypes.SellOrdersMargin:
+						case PositionChangeTypes.OrdersMargin:
+							writer.WriteDecimal((decimal)change.Value, 0);
+							break;
+						case PositionChangeTypes.SettlementPrice:
+							SerializeChange(writer, metaInfo.SettlementPrice, (decimal)change.Value);
+							break;
+						case PositionChangeTypes.BuyOrdersCount:
+						case PositionChangeTypes.SellOrdersCount:
+						case PositionChangeTypes.OrdersCount:
+						case PositionChangeTypes.TradesCount:
+							writer.WriteInt((int)change.Value);
+							break;
 						default:
-							throw new ArgumentOutOfRangeException();
+							throw new InvalidOperationException(change.Key.To<string>());
 					}
 				}
+
+				if (metaInfo.Version < MarketDataVersions.Version34)
+					continue;
+
+				writer.WriteStringEx(message.Description);
+				writer.WriteStringEx(message.StrategyId);
+
+				if (!buildFrom)
+					continue;
+
+				writer.WriteBuildFrom(message.BuildFrom);
+
+				if (!side)
+					continue;
+
+				writer.WriteNullableSide(message.Side);
 			}
 		}
 
@@ -291,6 +340,9 @@ namespace StockSharp.Algo.Storages.Binary
 		{
 			var reader = enumerator.Reader;
 			var metaInfo = enumerator.MetaInfo;
+
+			var buildFrom = metaInfo.Version >= MarketDataVersions.Version35;
+			var side = metaInfo.Version >= MarketDataVersions.Version36;
 
 			var posMsg = new PositionChangeMessage { SecurityId = SecurityId };
 
@@ -374,10 +426,42 @@ namespace StockSharp.Algo.Storages.Binary
 					case PositionChangeTypes.ExpirationDate:
 						posMsg.Add(type, reader.ReadDto().Value);
 						break;
+					case PositionChangeTypes.CommissionMaker:
+					case PositionChangeTypes.CommissionTaker:
+					case PositionChangeTypes.BuyOrdersMargin:
+					case PositionChangeTypes.SellOrdersMargin:
+					case PositionChangeTypes.OrdersMargin:
+						posMsg.Add(type, reader.ReadDecimal(0));
+						break;
+					case PositionChangeTypes.SettlementPrice:
+						posMsg.Add(type, DeserializeChange(reader, metaInfo.SettlementPrice));
+						break;
+					case PositionChangeTypes.BuyOrdersCount:
+					case PositionChangeTypes.SellOrdersCount:
+					case PositionChangeTypes.OrdersCount:
+					case PositionChangeTypes.TradesCount:
+						posMsg.Add(type, reader.ReadInt());
+						break;
 					default:
-						throw new ArgumentOutOfRangeException();
+						throw new InvalidOperationException(type.To<string>());
 				}
 			}
+
+			if (metaInfo.Version < MarketDataVersions.Version34)
+				return posMsg;
+
+			posMsg.Description = reader.ReadStringEx();
+			posMsg.StrategyId = reader.ReadStringEx();
+
+			if (!buildFrom)
+				return posMsg;
+
+			posMsg.BuildFrom = reader.ReadBuildFrom();
+
+			if (!side)
+				return posMsg;
+
+			posMsg.Side = reader.ReadNullableSide();
 
 			return posMsg;
 		}

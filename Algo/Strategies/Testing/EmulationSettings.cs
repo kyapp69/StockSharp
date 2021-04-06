@@ -84,7 +84,7 @@ namespace StockSharp.Algo.Strategies.Testing
 			set
 			{
 				if (value <= TimeSpan.Zero)
-					throw new ArgumentOutOfRangeException();
+					throw new ArgumentOutOfRangeException(nameof(value), value, LocalizedStrings.Str1219);
 
 				_marketTimeChangedInterval = value;
 				NotifyPropertyChanged(nameof(MarketTimeChangedInterval));
@@ -109,7 +109,7 @@ namespace StockSharp.Algo.Strategies.Testing
 			set
 			{
 				if (value <= TimeSpan.Zero)
-					throw new ArgumentOutOfRangeException();
+					throw new ArgumentOutOfRangeException(nameof(value), value, LocalizedStrings.Str1219);
 
 				_unrealizedPnLInterval = value;
 				NotifyPropertyChanged(nameof(UnrealizedPnLInterval));
@@ -179,7 +179,7 @@ namespace StockSharp.Algo.Strategies.Testing
 			}
 		}
 
-		private int _batchSize = 10;
+		private int _batchSize = Environment.ProcessorCount * 2;
 
 		/// <summary>
 		/// Number of simultaneously tested strategies.

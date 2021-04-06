@@ -53,9 +53,7 @@ namespace StockSharp.Algo.Strategies.Reporting
 		{
 		}
 
-		/// <summary>
-		/// To generate the report.
-		/// </summary>
+		/// <inheritdoc />
 		public override void Generate()
 		{
 			using (var writer = new StreamWriter(FileName))
@@ -79,14 +77,14 @@ namespace StockSharp.Algo.Strategies.Reporting
 
 					WriteValues(writer, LocalizedStrings.Orders);
 					WriteValues(writer, LocalizedStrings.Str1190, LocalizedStrings.Transaction, LocalizedStrings.Str128, LocalizedStrings.Time, LocalizedStrings.Price,
-						LocalizedStrings.Str1323, LocalizedStrings.Str1324, LocalizedStrings.State, LocalizedStrings.Str1325,
+						LocalizedStrings.Str1324, LocalizedStrings.State, LocalizedStrings.Str1325,
 						LocalizedStrings.Volume, LocalizedStrings.Type, LocalizedStrings.Str1326, LocalizedStrings.Str1327);
 
 					foreach (var order in strategy.Orders)
 					{
-						WriteValues(writer, order.Id, order.TransactionId, Format(order.Direction), order.Time, order.Price, order.GetAveragePrice(strategy.Connector),
+						WriteValues(writer, order.Id, order.TransactionId, Format(order.Direction), order.Time, order.Price,
 							Format(order.State), order.IsMatched() ? LocalizedStrings.Str1328 : (order.IsCanceled() ? LocalizedStrings.Str1329 : string.Empty), order.Balance,
-								order.Volume, Format(order.Type), Format(order.LatencyRegistration), Format(order.LatencyCancellation));
+								order.Volume, Format(order.Type), Format(order.LatencyRegistration), Format(order.LatencyCancellation), Format(order.LatencyEdition));
 					}
 
 					WriteValues(writer, LocalizedStrings.Str985);
@@ -96,7 +94,7 @@ namespace StockSharp.Algo.Strategies.Reporting
 					foreach (var trade in strategy.MyTrades)
 					{
 						WriteValues(writer, trade.Trade.Id, trade.Order.TransactionId, Format(trade.Trade.Time), trade.Trade.Price, trade.Trade.Volume,
-							Format(trade.Order.Direction), trade.Order.Id, strategy.PnLManager.ProcessMessage(trade.ToMessage()).PnL, trade.Slippage);
+							Format(trade.Order.Direction), trade.Order.Id, strategy.PnLManager.ProcessMessage(trade.ToMessage())?.PnL, trade.Slippage);
 					}
 				}
 			}
@@ -122,85 +120,5 @@ namespace StockSharp.Algo.Strategies.Reporting
 			writer.WriteLine();
 		}
 
-		//private void Save()
-		//{
-
-
-
-		//    using (var sw = new StreamWriter(FileName))
-		//    {
-		//        sw.WriteLine("; All Trades; Long Trades; Short Trades");
-
-		//        sw.WriteLine("Net Profit; " + _strategyStatistics.NetProfit + "; " + _strategyStatistics.NetLongProfit +
-		//                     "; " + _strategyStatistics.NetShortProfit);
-		//        sw.WriteLine("Number of Trades; " + _strategyStatistics.NumberOfTrades + "; " +
-		//                     _strategyStatistics.NumberOfLongTrades + "; " +
-		//                     _strategyStatistics.NumberOfShortTrades);
-		//        sw.WriteLine("Average Profit; " + _strategyStatistics.AverageProfit + "; " +
-		//                     _strategyStatistics.AverageLongProfit + "; " + _strategyStatistics.AverageShortProfit);
-		//        sw.WriteLine("Average Profit %; " + _strategyStatistics.AverageNetProfitPrc + "%; " +
-		//                     _strategyStatistics.AverageLongNetProfitPrc + "%; " +
-		//                     _strategyStatistics.AverageShortNetProfitPrc + "%");
-		//        sw.WriteLine(";;;");
-		//        sw.WriteLine("Winning Trades; " + _strategyStatistics.WinningTrades + "; " +
-		//                     _strategyStatistics.WinningLongTrades + "; " + _strategyStatistics.LosingLongTrades);
-		//        sw.WriteLine("Win Rate; " + _strategyStatistics.WinRate + "%; " + _strategyStatistics.WinLongRate + "%; " +
-		//                     _strategyStatistics.WinShortRate + "%");
-		//        sw.WriteLine("Gross Profit; " + _strategyStatistics.GrossProfit + "; " + _strategyStatistics.GrossLongProfit +
-		//                     "; " + _strategyStatistics.GrossShortProfit);
-		//        sw.WriteLine("Average Profit; " + _strategyStatistics.AverageWinProfit + "; " +
-		//                     _strategyStatistics.AverageWinLongProfit + "; " +
-		//                     _strategyStatistics.AverageWinShortProfit);
-		//        sw.WriteLine("Average Profit %; " + _strategyStatistics.AverageWinProfitPrc + "%; " +
-		//                     _strategyStatistics.AverageWinLongProfitPrc + "%; " +
-		//                     _strategyStatistics.AverageWinShortProfitPrc + "%");
-		//        sw.WriteLine(";;;");
-		//        sw.WriteLine("Losing Trades; " + _strategyStatistics.LosingTrades + "; " +
-		//                     _strategyStatistics.LosingLongTrades + "; " + _strategyStatistics.LosingShortTrades);
-		//        sw.WriteLine("Loss Rate; " + _strategyStatistics.LossRate + "%; " + _strategyStatistics.LossLongRate + "%; " +
-		//                     _strategyStatistics.LossShortRate + "%");
-		//        sw.WriteLine("Gross Loss; " + _strategyStatistics.GrossLoss + "; " + _strategyStatistics.GrossLongLoss +
-		//                     "; " + _strategyStatistics.GrossShortLoss);
-		//        sw.WriteLine("Average Loss; " + _strategyStatistics.AverageLoss + "; " + _strategyStatistics.AverageLongLoss +
-		//                     "; " + _strategyStatistics.AverageShortLoss);
-		//        sw.WriteLine("Average Loss %; " + _strategyStatistics.AverageLossPrc + "%; " +
-		//                     _strategyStatistics.AverageLongLossPrc + "%; " +
-		//                     _strategyStatistics.AverageShortLossPrc + "%");
-		//        sw.WriteLine(";;;");
-		//        sw.WriteLine("Maximum Drawdown; " + _strategyStatistics.MaxDrawdown + "; " +
-		//                     _strategyStatistics.MaxLongDrawdown + "; " + _strategyStatistics.MaxShortDrawdown);
-		//        sw.WriteLine("Profit Factor; " + _strategyStatistics.ProfitFactor + "; " +
-		//                     _strategyStatistics.ProfitFactorLong + "; " + _strategyStatistics.ProfitFactorShort);
-		//        sw.WriteLine("Recovery Factor; " + _strategyStatistics.RecoveryFactor + "; " +
-		//                     _strategyStatistics.RecoveryFactorLong + "; " +
-		//                     _strategyStatistics.RecoveryFactorShort);
-		//        sw.WriteLine("Payoff Ratio; " + _strategyStatistics.PayoffRatio + "; " + _strategyStatistics.PayoffRatioLong +
-		//                     "; " + _strategyStatistics.PayoffRatioShort);
-		//        sw.WriteLine("Smoothness Factor; " + _strategyStatistics.SmoothnessFactor);
-
-		//        sw.WriteLine(";;;");
-		//        sw.WriteLine(";;;");
-		//        sw.WriteLine(";;;");
-
-		//        var index = 0;
-		//        sw.WriteLine(
-		//            "Position; Quantity; Entry Date; Entry Price; Exit Date; Exit Price; Equity; Long; Short; Median;");
-		//        foreach (var kvp in _strategyStatistics.TradePairs)
-		//        {
-		//            sw.WriteLine(
-		//                kvp.Value.FirstTrade.OrderDirection + ";" +
-		//                kvp.Value.FirstTrade.Volume + ";" +
-		//                kvp.Value.FirstTrade.Time + ";" +
-		//                kvp.Value.FirstTrade.Price + ";" +
-		//                kvp.Value.SecondTrade.Time + ";" +
-		//                kvp.Value.SecondTrade.Price + ";" +
-		//                _strategyStatistics.Equity[index] + ";" +
-		//                _strategyStatistics.LongEquity[index] + ";" +
-		//                _strategyStatistics.ShortEquity[index] + ";" +
-		//                _strategyStatistics.EquityMedian[index]);
-		//            index++;
-		//        }
-		//    }
-		//}
 	}
 }

@@ -18,12 +18,15 @@ namespace StockSharp.BusinessEntities
 	using System;
 	using System.Collections.Generic;
 	using System.ComponentModel;
+	using System.Runtime.CompilerServices;
 	using System.Runtime.Serialization;
 	using System.Xml.Serialization;
 
 	using Ecng.Common;
+	using Ecng.Localization;
 	using Ecng.Serialization;
 
+	using StockSharp.Localization;
 	using StockSharp.Messages;
 
 	/// <summary>
@@ -43,8 +46,6 @@ namespace StockSharp.BusinessEntities
 		/// </summary>
 		public Exchange()
 		{
-			ExtensionInfo = new Dictionary<string, object>();
-			RusName = EngName = string.Empty;
 		}
 
 		private string _name;
@@ -63,45 +64,45 @@ namespace StockSharp.BusinessEntities
 					return;
 
 				_name = value;
-				Notify(nameof(Name));
+				Notify();
 			}
 		}
 
-		private string _rusName;
+		private string GetLocName(string language) => FullNameLoc.IsEmpty() ? null : LocalizedStrings.GetString(FullNameLoc, language);
 
 		/// <summary>
 		/// Russian exchange name.
 		/// </summary>
-		[DataMember]
-		public string RusName
-		{
-			get => _rusName;
-			set
-			{
-				if (RusName == value)
-					return;
-
-				_rusName = value;
-				Notify(nameof(RusName));
-			}
-		}
-
-		private string _engName;
+		[Obsolete]
+		public string RusName => GetLocName(LangCodes.Ru);
 
 		/// <summary>
 		/// English exchange name.
 		/// </summary>
+		[Obsolete]
+		public string EngName => GetLocName(LangCodes.En);
+
+		/// <summary>
+		/// Full name.
+		/// </summary>
+		public string FullName => GetLocName(null);
+
+		private string _fullNameLoc;
+
+		/// <summary>
+		/// Full name (localization key).
+		/// </summary>
 		[DataMember]
-		public string EngName
+		public string FullNameLoc
 		{
-			get => _engName;
+			get => _fullNameLoc;
 			set
 			{
-				if (EngName == value)
+				if (FullNameLoc == value)
 					return;
 
-				_engName = value;
-				Notify(nameof(EngName));
+				_fullNameLoc = value;
+				Notify();
 			}
 		}
 
@@ -121,38 +122,34 @@ namespace StockSharp.BusinessEntities
 					return;
 
 				_countryCode = value;
-				Notify(nameof(CountryCode));
+				Notify();
 			}
 		}
 
 		[field: NonSerialized]
-		private IDictionary<string, object> _extensionInfo;
+		private IDictionary<string, object> _extensionInfo/* = new Dictionary<string, object>()*/;
 
-		/// <summary>
-		/// Extended exchange info.
-		/// </summary>
-		/// <remarks>
-		/// Required if additional information associated with the exchange is stored in the program.
-		/// </remarks>
+		/// <inheritdoc />
 		[XmlIgnore]
 		[Browsable(false)]
 		[DataMember]
+		[Obsolete]
 		public IDictionary<string, object> ExtensionInfo
 		{
 			get => _extensionInfo;
 			set
 			{
-				_extensionInfo = value ?? throw new ArgumentNullException(nameof(value));
-				Notify(nameof(ExtensionInfo));
+				_extensionInfo = value/* ?? throw new ArgumentNullException(nameof(value))*/;
+				Notify();
 			}
 		}
 
-		[OnDeserialized]
-		private void AfterDeserialization(StreamingContext ctx)
-		{
-			if (ExtensionInfo == null)
-				ExtensionInfo = new Dictionary<string, object>();
-		}
+		//[OnDeserialized]
+		//private void AfterDeserialization(StreamingContext ctx)
+		//{
+		//	if (ExtensionInfo == null)
+		//		ExtensionInfo = new Dictionary<string, object>();
+		//}
 
 		[field: NonSerialized]
 		private PropertyChangedEventHandler _propertyChanged;
@@ -163,19 +160,13 @@ namespace StockSharp.BusinessEntities
 			remove => _propertyChanged -= value;
 		}
 
-		private void Notify(string info)
+		private void Notify([CallerMemberName]string propertyName = null)
 		{
-			_propertyChanged?.Invoke(this, info);
+			_propertyChanged?.Invoke(this, propertyName);
 		}
 
-		/// <summary>
-		/// Returns a string that represents the current object.
-		/// </summary>
-		/// <returns>A string that represents the current object.</returns>
-		public override string ToString()
-		{
-			return Name;
-		}
+		/// <inheritdoc />
+		public override string ToString() => Name;
 
 		/// <summary>
 		/// Compare <see cref="Exchange"/> on the equivalence.
@@ -187,14 +178,9 @@ namespace StockSharp.BusinessEntities
 			return Name == other.Name;
 		}
 
-		/// <summary>
-		/// Get the hash code of the object <see cref="Exchange"/>.
-		/// </summary>
-		/// <returns>A hash code.</returns>
-		public override int GetHashCode()
-		{
-			return Name.GetHashCode();
-		}
+		/// <summary>Serves as a hash function for a particular type. </summary>
+		/// <returns>A hash code for the current <see cref="T:System.Object" />.</returns>
+		public override int GetHashCode() => Name.GetHashCode();
 
 		/// <summary>
 		/// Create a copy of <see cref="Exchange"/>.
@@ -205,8 +191,7 @@ namespace StockSharp.BusinessEntities
 			return new Exchange
 			{
 				Name = Name,
-				RusName = RusName,
-				EngName = EngName,
+				FullNameLoc = FullNameLoc,
 				CountryCode = CountryCode,
 			};
 		}
@@ -218,8 +203,7 @@ namespace StockSharp.BusinessEntities
 		public void Load(SettingsStorage storage)
 		{
 			Name = storage.GetValue<string>(nameof(Name));
-			RusName = storage.GetValue<string>(nameof(RusName));
-			EngName = storage.GetValue<string>(nameof(EngName));
+			FullNameLoc = storage.GetValue<string>(nameof(FullNameLoc));
 			CountryCode = storage.GetValue<CountryCodes?>(nameof(CountryCode));
 		}
 
@@ -230,8 +214,7 @@ namespace StockSharp.BusinessEntities
 		public void Save(SettingsStorage storage)
 		{
 			storage.SetValue(nameof(Name), Name);
-			storage.SetValue(nameof(RusName), RusName);
-			storage.SetValue(nameof(EngName), EngName);
+			storage.SetValue(nameof(FullNameLoc), FullNameLoc);
 			storage.SetValue(nameof(CountryCode), CountryCode.To<string>());
 		}
 	}

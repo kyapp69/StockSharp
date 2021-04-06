@@ -197,15 +197,40 @@ namespace StockSharp.BusinessEntities
 		[Nullable]
 		public CurrencyTypes? Currency { get; set; }
 
+		/// <summary>
+		/// Sequence number.
+		/// </summary>
+		/// <remarks>Zero means no information.</remarks>
+		[DataMember]
+		public long SeqNum { get; set; }
+
+		/// <summary>
+		/// Determines the message is generated from the specified <see cref="Messages.DataType"/>.
+		/// </summary>
+		public Messages.DataType BuildFrom { get; set; }
+
+		/// <summary>
+		/// Yield.
+		/// </summary>
+		[DataMember]
+		public decimal? Yield { get; set; }
+
+		/// <summary>
+		/// Order id (buy).
+		/// </summary>
+		[DataMember]
+		public long? OrderBuyId { get; set; }
+
+		/// <summary>
+		/// Order id (sell).
+		/// </summary>
+		[DataMember]
+		public long? OrderSellId { get; set; }
+
 		[field: NonSerialized]
 		private IDictionary<string, object> _extensionInfo;
 
-		/// <summary>
-		/// Extended trade info.
-		/// </summary>
-		/// <remarks>
-		/// Required if additional information associated with the trade is stored in the program. For example, the operation that results to the trade.
-		/// </remarks>
+		/// <inheritdoc />
 		[Ignore]
 		[XmlIgnore]
 		[Display(
@@ -214,6 +239,7 @@ namespace StockSharp.BusinessEntities
 			Description = LocalizedStrings.Str427Key,
 			GroupName = LocalizedStrings.GeneralKey,
 			Order = 8)]
+		[Obsolete]
 		public IDictionary<string, object> ExtensionInfo
 		{
 			get => _extensionInfo;
@@ -241,6 +267,11 @@ namespace StockSharp.BusinessEntities
 				OpenInterest = OpenInterest,
 				IsUpTick = IsUpTick,
 				Currency = Currency,
+				SeqNum = SeqNum,
+				BuildFrom = BuildFrom,
+				Yield = Yield,
+				OrderBuyId = OrderBuyId,
+				OrderSellId = OrderSellId,
 			};
 		}
 
@@ -253,10 +284,7 @@ namespace StockSharp.BusinessEntities
 			return (Security?.GetHashCode() ?? 0) ^ Id.GetHashCode();
 		}
 
-		/// <summary>
-		/// Returns a string that represents the current object.
-		/// </summary>
-		/// <returns>A string that represents the current object.</returns>
+		/// <inheritdoc />
 		public override string ToString()
 		{
 			var idStr = Id == 0 ? StringId : Id.To<string>();

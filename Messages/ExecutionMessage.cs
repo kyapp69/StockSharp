@@ -18,7 +18,9 @@ namespace StockSharp.Messages
 	using System;
 	using System.ComponentModel;
 	using System.Runtime.Serialization;
+	using System.Xml.Serialization;
 
+	using Ecng.Common;
 	using Ecng.Serialization;
 
 	using StockSharp.Localization;
@@ -61,20 +63,18 @@ namespace StockSharp.Messages
 	/// </summary>
 	[Serializable]
 	[System.Runtime.Serialization.DataContract]
-	public sealed class ExecutionMessage : Message
+	public class ExecutionMessage : BaseSubscriptionIdMessage<ExecutionMessage>,
+		ITransactionIdMessage, IServerTimeMessage, ISecurityIdMessage, ISeqNumMessage,
+		IPortfolioNameMessage, IErrorMessage, IStrategyIdMessage, IGeneratedMessage
 	{
-		/// <summary>
-		/// Security ID.
-		/// </summary>
+		/// <inheritdoc />
 		[DataMember]
 		[DisplayNameLoc(LocalizedStrings.SecurityIdKey)]
 		[DescriptionLoc(LocalizedStrings.SecurityIdKey, true)]
 		[MainCategory]
 		public SecurityId SecurityId { get; set; }
 
-		/// <summary>
-		/// Portfolio name.
-		/// </summary>
+		/// <inheritdoc />
 		[DataMember]
 		[DisplayNameLoc(LocalizedStrings.PortfolioKey)]
 		[DescriptionLoc(LocalizedStrings.PortfolioNameKey)]
@@ -108,32 +108,19 @@ namespace StockSharp.Messages
 		[MainCategory]
 		public string DepoName { get; set; }
 
-		/// <summary>
-		/// Server time.
-		/// </summary>
+		/// <inheritdoc />
 		[DataMember]
 		[DisplayNameLoc(LocalizedStrings.ServerTimeKey)]
 		[DescriptionLoc(LocalizedStrings.ServerTimeKey, true)]
 		[MainCategory]
 		public DateTimeOffset ServerTime { get; set; }
 
-		/// <summary>
-		/// Transaction ID.
-		/// </summary>
+		/// <inheritdoc />
 		[DataMember]
 		[DisplayNameLoc(LocalizedStrings.TransactionKey)]
 		[DescriptionLoc(LocalizedStrings.TransactionIdKey, true)]
 		[MainCategory]
 		public long TransactionId { get; set; }
-
-		/// <summary>
-		/// ID of original transaction, for which this message is the answer.
-		/// </summary>
-		[DataMember]
-		[DisplayNameLoc(LocalizedStrings.OriginalTransactionKey)]
-		[DescriptionLoc(LocalizedStrings.OriginalTransactionIdKey)]
-		[MainCategory]
-		public long OriginalTransactionId { get; set; }
 
 		/// <summary>
 		/// Data type, information about which is contained in the <see cref="ExecutionMessage"/>.
@@ -152,7 +139,7 @@ namespace StockSharp.Messages
 		[DisplayNameLoc(LocalizedStrings.CancelKey)]
 		[DescriptionLoc(LocalizedStrings.IsActionOrderCancellationKey)]
 		[MainCategory]
-		public bool IsCancelled { get; set; }
+		public bool IsCancellation { get; set; }
 
 		/// <summary>
 		/// Order ID.
@@ -385,7 +372,7 @@ namespace StockSharp.Messages
 		/// Deal initiator (seller or buyer).
 		/// </summary>
 		[DataMember]
-		[DisplayNameLoc(LocalizedStrings.Str148Key)]
+		[DisplayNameLoc(LocalizedStrings.InitiatorKey)]
 		[DescriptionLoc(LocalizedStrings.Str149Key)]
 		[MainCategory]
 		[Nullable]
@@ -401,12 +388,11 @@ namespace StockSharp.Messages
 		[Nullable]
 		public decimal? OpenInterest { get; set; }
 
-		/// <summary>
-		/// Error registering/cancelling order.
-		/// </summary>
+		/// <inheritdoc />
 		[DisplayNameLoc(LocalizedStrings.Str152Key)]
 		[DescriptionLoc(LocalizedStrings.Str153Key, true)]
 		[MainCategory]
+		[XmlIgnore]
 		public Exception Error { get; set; }
 
 		/// <summary>
@@ -415,16 +401,8 @@ namespace StockSharp.Messages
 		[DisplayNameLoc(LocalizedStrings.Str154Key)]
 		[DescriptionLoc(LocalizedStrings.Str155Key)]
 		[CategoryLoc(LocalizedStrings.Str156Key)]
+		[XmlIgnore]
 		public OrderCondition Condition { get; set; }
-
-		///// <summary>
-		///// Является ли сообщение последним в запрашиваемом пакете (только для исторических сделок).
-		///// </summary>
-		//[DataMember]
-		//[DisplayName("Последний")]
-		//[Description("Является ли сообщение последним в запрашиваемом пакете (только для исторических сделок).")]
-		//[MainCategory]
-		//public bool IsFinished { get; set; }
 
 		/// <summary>
 		/// Is tick uptrend or downtrend in price. Uses only <see cref="ExecutionType"/> for <see cref="ExecutionTypes.Tick"/>.
@@ -480,6 +458,10 @@ namespace StockSharp.Messages
 		[MainCategory]
 		public string UserOrderId { get; set; }
 
+		/// <inheritdoc />
+		[DataMember]
+		public string StrategyId { get; set; }
+
 		/// <summary>
 		/// Trading security currency.
 		/// </summary>
@@ -527,6 +509,76 @@ namespace StockSharp.Messages
 		public bool? IsMargin { get; set; }
 
 		/// <summary>
+		/// Is order manual.
+		/// </summary>
+		[DataMember]
+		[DisplayNameLoc(LocalizedStrings.ManualKey)]
+		[DescriptionLoc(LocalizedStrings.IsOrderManualKey)]
+		public bool? IsManual { get; set; }
+
+		/// <summary>
+		/// Average execution price.
+		/// </summary>
+		[DataMember]
+		public decimal? AveragePrice { get; set; }
+
+		/// <summary>
+		/// Yield.
+		/// </summary>
+		[DataMember]
+		public decimal? Yield { get; set; }
+
+		/// <summary>
+		/// Minimum quantity of an order to be executed.
+		/// </summary>
+		[DataMember]
+		public decimal? MinVolume { get; set; }
+
+		/// <summary>
+		/// Position effect.
+		/// </summary>
+		[DataMember]
+		public OrderPositionEffects? PositionEffect { get; set; }
+
+		/// <summary>
+		/// Post-only order.
+		/// </summary>
+		[DataMember]
+		public bool? PostOnly { get; set; }
+
+		/// <summary>
+		/// Used to identify whether the order initiator is an aggressor or not in the trade.
+		/// </summary>
+		[DataMember]
+		public bool? Initiator { get; set; }
+
+		/// <inheritdoc />
+		[DataMember]
+		public long SeqNum { get; set; }
+
+		/// <inheritdoc />
+		[DataMember]
+		public DataType BuildFrom { get; set; }
+
+		/// <summary>
+		/// Margin leverage.
+		/// </summary>
+		[DataMember]
+		public int? Leverage { get; set; }
+
+		/// <summary>
+		/// Order id (buy).
+		/// </summary>
+		[DataMember]
+		public long? OrderBuyId { get; set; }
+
+		/// <summary>
+		/// Order id (sell).
+		/// </summary>
+		[DataMember]
+		public long? OrderSellId { get; set; }
+
+		/// <summary>
 		/// Initializes a new instance of the <see cref="ExecutionMessage"/>.
 		/// </summary>
 		public ExecutionMessage()
@@ -534,86 +586,116 @@ namespace StockSharp.Messages
 		{
 		}
 
-		/// <summary>
-		/// Returns a string that represents the current object.
-		/// </summary>
-		/// <returns>A string that represents the current object.</returns>
+		/// <inheritdoc />
+		public override DataType DataType => ExecutionType.Value.ToDataType();
+
+		/// <inheritdoc />
 		public override string ToString()
 		{
-			return base.ToString() + $",T(S)={ServerTime:yyyy/MM/dd HH:mm:ss.fff},({ExecutionType}),Sec={SecurityId},Ord={OrderId}/{TransactionId}/{OriginalTransactionId},Fail={Error},Price={OrderPrice},OrdVol={OrderVolume},TrVol={TradeVolume},Bal={Balance},TId={TradeId},Pf={PortfolioName},TPrice={TradePrice},UId={UserOrderId},State={OrderState}";
+			var str = base.ToString() + $",T(S)={ServerTime:yyyy/MM/dd HH:mm:ss.fff},({ExecutionType}),Sec={SecurityId},O/T={HasOrderInfo}/{HasTradeInfo},Ord={OrderId}/{TransactionId}/{OriginalTransactionId},Fail={Error},Price={OrderPrice},OrdVol={OrderVolume},TrVol={TradeVolume},Bal={Balance},TId={TradeId},Pf={PortfolioName},TPrice={TradePrice},UId={UserOrderId},Type={OrderType},State={OrderState},Cond={Condition}";
+
+			if (!StrategyId.IsEmpty())
+				str += $",Strategy={StrategyId}";
+
+			if (PositionEffect != null)
+				str += $",PosEffect={PositionEffect.Value}";
+
+			if (PostOnly != null)
+				str += $",PostOnly={PostOnly.Value}";
+
+			if (Initiator != null)
+				str += $",Initiator={Initiator.Value}";
+
+			if (SeqNum != default)
+				str += $",SeqNum={SeqNum}";
+
+			if (Leverage != null)
+				str += $",Leverage={Leverage.Value}";
+
+			if (OrderBuyId != null)
+				str += $",buy (id)={OrderBuyId.Value}";
+
+			if (OrderSellId != null)
+				str += $",sell (id)={OrderSellId.Value}";
+
+			return str;
 		}
 
-		/// <summary>
-		/// Create a copy of <see cref="ExecutionMessage"/>.
-		/// </summary>
-		/// <returns>Copy.</returns>
-		public override Message Clone()
+		/// <inheritdoc />
+		public override void CopyTo(ExecutionMessage destination)
 		{
-			var clone = new ExecutionMessage
-			{
-				Balance = Balance,
-				Comment = Comment,
-				Condition = Condition?.Clone(),
-				ClientCode = ClientCode,
-				BrokerCode = BrokerCode,
-				Currency = Currency,
-				ServerTime = ServerTime,
-				DepoName = DepoName,
-				Error = Error,
-				ExpiryDate = ExpiryDate,
-				IsSystem = IsSystem,
-				LocalTime = LocalTime,
-				OpenInterest = OpenInterest,
-				OrderId = OrderId,
-				OrderStringId = OrderStringId,
-				OrderBoardId = OrderBoardId,
-				ExecutionType = ExecutionType,
-				IsCancelled = IsCancelled,
-				//Action = Action,
-				OrderState = OrderState,
-				OrderStatus = OrderStatus,
-				OrderType = OrderType,
-				OriginSide = OriginSide,
-				PortfolioName = PortfolioName,
-				OrderPrice = OrderPrice,
-				SecurityId = SecurityId,
-				Side = Side,
-				SystemComment = SystemComment,
-				TimeInForce = TimeInForce,
-				TradeId = TradeId,
-				TradeStringId = TradeStringId,
-				TradePrice = TradePrice,
-				TradeStatus = TradeStatus,
-				TransactionId = TransactionId,
-				OriginalTransactionId = OriginalTransactionId,
-				OrderVolume = OrderVolume,
-				TradeVolume = TradeVolume,
-				//IsFinished = IsFinished,
-				VisibleVolume = VisibleVolume,
-				IsUpTick = IsUpTick,
-				Commission = Commission,
-				Latency = Latency,
-				Slippage = Slippage,
-				UserOrderId = UserOrderId,
+			base.CopyTo(destination);
 
-				//DerivedOrderId = DerivedOrderId,
-				//DerivedOrderStringId = DerivedOrderStringId,
+			destination.Balance = Balance;
+			destination.Comment = Comment;
+			destination.Condition = Condition?.Clone();
+			destination.ClientCode = ClientCode;
+			destination.BrokerCode = BrokerCode;
+			destination.Currency = Currency;
+			destination.ServerTime = ServerTime;
+			destination.DepoName = DepoName;
+			destination.Error = Error;
+			destination.ExpiryDate = ExpiryDate;
+			destination.IsSystem = IsSystem;
+			destination.OpenInterest = OpenInterest;
+			destination.OrderId = OrderId;
+			destination.OrderStringId = OrderStringId;
+			destination.OrderBoardId = OrderBoardId;
+			destination.ExecutionType = ExecutionType;
+			destination.IsCancellation = IsCancellation;
+			//destination.Action = Action;
+			destination.OrderState = OrderState;
+			destination.OrderStatus = OrderStatus;
+			destination.OrderType = OrderType;
+			destination.OriginSide = OriginSide;
+			destination.PortfolioName = PortfolioName;
+			destination.OrderPrice = OrderPrice;
+			destination.SecurityId = SecurityId;
+			destination.Side = Side;
+			destination.SystemComment = SystemComment;
+			destination.TimeInForce = TimeInForce;
+			destination.TradeId = TradeId;
+			destination.TradeStringId = TradeStringId;
+			destination.TradePrice = TradePrice;
+			destination.TradeStatus = TradeStatus;
+			destination.TransactionId = TransactionId;
+			destination.OrderVolume = OrderVolume;
+			destination.TradeVolume = TradeVolume;
+			//destination.IsFinished = IsFinished;
+			destination.VisibleVolume = VisibleVolume;
+			destination.IsUpTick = IsUpTick;
+			destination.Commission = Commission;
+			destination.Latency = Latency;
+			destination.Slippage = Slippage;
+			destination.UserOrderId = UserOrderId;
+			destination.StrategyId = StrategyId;
 
-				PnL = PnL,
-				Position = Position,
+			//destination.DerivedOrderId = DerivedOrderId;
+			//destination.DerivedOrderStringId = DerivedOrderStringId;
 
-				HasTradeInfo = HasTradeInfo,
-				HasOrderInfo = HasOrderInfo,
+			destination.PnL = PnL;
+			destination.Position = Position;
 
-				IsMarketMaker = IsMarketMaker,
-				IsMargin = IsMargin,
+			destination.HasTradeInfo = HasTradeInfo;
+			destination.HasOrderInfo = HasOrderInfo;
 
-				CommissionCurrency = CommissionCurrency,
-			};
+			destination.IsMarketMaker = IsMarketMaker;
+			destination.IsMargin = IsMargin;
+			destination.IsManual = IsManual;
 
-			this.CopyExtensionInfo(clone);
+			destination.CommissionCurrency = CommissionCurrency;
 
-			return clone;
+			destination.AveragePrice = AveragePrice;
+			destination.Yield = Yield;
+			destination.MinVolume = MinVolume;
+			destination.PositionEffect = PositionEffect;
+			destination.PostOnly = PostOnly;
+			destination.Initiator = Initiator;
+			destination.SeqNum = SeqNum;
+			destination.BuildFrom = BuildFrom;
+			destination.Leverage = Leverage;
+			destination.OrderBuyId = OrderBuyId;
+			destination.OrderSellId = OrderSellId;
 		}
 	}
 }

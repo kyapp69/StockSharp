@@ -151,7 +151,7 @@ Console.WriteLine("Заявка на RIZ0 зарегистрирована");]]>
 			  <content>
 				  <para>
 					  Для более удобной работы с несколькими <codeEntityReference>T:StockSharp.Quik.QuikTrader</codeEntityReference>-ами
-					  <token>stocksharp</token> предоставляет <link xlink:href="1cfb4f7c-b9fc-43da-a958-b0e0f881479d" />.
+					  <token>stocksharp</token> предоставляет <link xlink:href="db1de349-84ef-4e59-a30b-c34a9d47bed2" />.
 				  </para>
 			  </content>
 		  </step>
@@ -217,12 +217,6 @@ Console.WriteLine("Заявка на RIZ0 зарегистрирована");]]>
       <codeEntityReference>T:MyNamespace.MyClass</codeEntityReference>
       <codeEntityReference>P:MyNamespace.MyClass.MyProp</codeEntityReference>
       <codeEntityReference>M:System.IO.File.OpenText(System.String)</codeEntityReference>
-
-      <externalLink>
-        <linkText>Sandcastle Styles</linkText>
-        <linkAlternateText>Sandcastle Styles on CodePlex</linkAlternateText>
-        <linkUri>http://codeplex.com/SandcastleStyles</linkUri>
-      </externalLink>
 
       <externalLink>
         <linkText>Change Log</linkText>

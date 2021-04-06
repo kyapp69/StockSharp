@@ -8,7 +8,6 @@ namespace StockSharp.Algo.Strategies.Analytics
 
 	using Ecng.Collections;
 	using Ecng.ComponentModel;
-	using Ecng.Xaml;
 
 	using StockSharp.Algo.Candles;
 	using StockSharp.Algo.Storages;
@@ -32,7 +31,7 @@ namespace StockSharp.Algo.Strategies.Analytics
 				set
 				{
 					_volume = value;
-					NotifyChanged(nameof(Volume));
+					NotifyChanged();
 				}
 			}
 		}
@@ -62,15 +61,13 @@ namespace StockSharp.Algo.Strategies.Analytics
 			_timeFrame = this.Param(nameof(TimeFrame), TimeSpan.FromMinutes(5));
 		}
 
-		/// <summary>
-		/// To analyze.
-		/// </summary>
+		/// <inheritdoc />
 		protected override void OnAnalyze()
 		{
 			// clear prev values
 			Panel.ClearControls();
 
-			ThreadSafeObservableCollection<GridRow> gridSeries = null;
+			ICollection<GridRow> gridSeries = null;
 			IAnalyticsChart chart = null;
 
 			switch (ResultType)
@@ -83,9 +80,7 @@ namespace StockSharp.Algo.Strategies.Analytics
 					var volumeColumn = grid.AddColumn(nameof(GridRow.Volume), LocalizedStrings.Volume);
 					volumeColumn.Width = 100;
 
-					var gridSource = new ObservableCollectionEx<GridRow>();
-					grid.ItemsSource = gridSource;
-					gridSeries = new ThreadSafeObservableCollection<GridRow>(gridSource);
+					gridSeries = grid.CreateSource<GridRow>();
 
 					grid.SetSort(volumeColumn, ListSortDirection.Descending);
 					break;
@@ -126,7 +121,7 @@ namespace StockSharp.Algo.Strategies.Analytics
 					// load candles
 					var candles = storage.Load(loadDate);
 
-					// groupping candles by candle's middle price
+					// grouping candles by candle's middle price
 					var groupedCandles = candles.GroupBy(c => c.LowPrice + c.GetLength() / 2);
 
 					foreach (var group in groupedCandles.OrderBy(g => g.Key))
@@ -147,7 +142,7 @@ namespace StockSharp.Algo.Strategies.Analytics
 							rows.Add(price, row = new GridRow { Price = price, Volume = sumVol });
 
 							// draw on chart
-							chart?.Append(price, sumVol);
+							chart?.Append(loadDate, price, sumVol);
 
 							// draw on table
 							gridSeries?.Add(row);
@@ -158,7 +153,7 @@ namespace StockSharp.Algo.Strategies.Analytics
 							row.Volume += sumVol;
 
 							// update chart
-							chart?.Update(price, row.Volume);
+							chart?.Update(loadDate, price, row.Volume);
 						}
 					}
 

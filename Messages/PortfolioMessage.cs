@@ -19,6 +19,8 @@ namespace StockSharp.Messages
 	using System.ComponentModel.DataAnnotations;
 	using System.Runtime.Serialization;
 
+	using Ecng.Common;
+
 	using StockSharp.Localization;
 
 	/// <summary>
@@ -48,11 +50,10 @@ namespace StockSharp.Messages
 	/// </summary>
 	[DataContract]
 	[Serializable]
-	public class PortfolioMessage : Message
+	public class PortfolioMessage : BaseSubscriptionIdMessage<PortfolioMessage>,
+	        ISubscriptionMessage, IPortfolioNameMessage
 	{
-		/// <summary>
-		/// Portfolio code name.
-		/// </summary>
+		/// <inheritdoc />
 		[DataMember]
 		[DisplayNameLoc(LocalizedStrings.NameKey)]
 		[DescriptionLoc(LocalizedStrings.Str247Key)]
@@ -95,26 +96,38 @@ namespace StockSharp.Messages
 		//[MainCategory]
 		//public PortfolioStates? State { get; set; }
 
-		/// <summary>
-		/// ID of the original message <see cref="TransactionId"/> for which this message is a response.
-		/// </summary>
-		[DataMember]
-		public long OriginalTransactionId { get; set; }
-
-		/// <summary>
-		/// Subscription/unsubscription portfolio changes transaction id.
-		/// </summary>
+		/// <inheritdoc />
 		[DataMember]
 		[DisplayNameLoc(LocalizedStrings.TransactionKey)]
 		[DescriptionLoc(LocalizedStrings.TransactionIdKey, true)]
 		[MainCategory]
 		public long TransactionId { get; set; }
 
-		/// <summary>
-		/// Is the message subscription portfolio changes.
-		/// </summary>
+		/// <inheritdoc />
 		[DataMember]
 		public bool IsSubscribe { get; set; }
+
+		/// <inheritdoc />
+		[DataMember]
+		[DisplayNameLoc(LocalizedStrings.Str343Key)]
+		[DescriptionLoc(LocalizedStrings.Str344Key)]
+		[MainCategory]
+		public DateTimeOffset? From { get; set; }
+
+		/// <inheritdoc />
+		[DataMember]
+		[DisplayNameLoc(LocalizedStrings.Str345Key)]
+		[DescriptionLoc(LocalizedStrings.Str346Key)]
+		[MainCategory]
+		public DateTimeOffset? To { get; set; }
+
+		/// <inheritdoc />
+		[DataMember]
+		public long? Skip { get; set; }
+
+		/// <inheritdoc />
+		[DataMember]
+		public long? Count { get; set; }
 
 		/// <summary>
 		/// Initializes a new instance of the <see cref="PortfolioMessage"/>.
@@ -134,39 +147,61 @@ namespace StockSharp.Messages
 		}
 
 		/// <inheritdoc />
+		public override DataType DataType => DataType.Portfolio(PortfolioName);
+
+		bool ISubscriptionMessage.FilterEnabled
+			=>
+			!PortfolioName.IsEmpty() || Currency != null ||
+			!BoardCode.IsEmpty() || !ClientCode.IsEmpty();
+
+		/// <inheritdoc />
 		public override string ToString()
 		{
-			return base.ToString() + $",Name={PortfolioName}";
+			var str = base.ToString() + $",Name={PortfolioName}";
+
+			if (TransactionId > 0)
+				str += $",TransId={TransactionId}";
+
+			if (Currency != default)
+				str += $",Curr={Currency.Value}";
+
+			if (!BoardCode.IsEmpty())
+				str += $",Board={BoardCode}";
+
+			if (IsSubscribe)
+				str += $",IsSubscribe={IsSubscribe}";
+
+			if (From != default)
+				str += $",From={From.Value}";
+
+			if (To != default)
+				str += $",To={To.Value}";
+
+			if (Skip != default)
+				str += $",Skip={Skip.Value}";
+
+			if (Count != default)
+				str += $",Count={Count.Value}";
+
+			return str;
 		}
 
-		/// <summary>
-		/// Create a copy of <see cref="PortfolioMessage"/>.
-		/// </summary>
-		/// <returns>Copy.</returns>
-		public override Message Clone()
+		/// <inheritdoc />
+		public override void CopyTo(PortfolioMessage destination)
 		{
-			return CopyTo(new PortfolioMessage());
-		}
+			base.CopyTo(destination);
 
-		/// <summary>
-		/// Copy the message into the <paramref name="destination" />.
-		/// </summary>
-		/// <param name="destination">The object, to which copied information.</param>
-		/// <returns>The object, to which copied information.</returns>
-		protected PortfolioMessage CopyTo(PortfolioMessage destination)
-		{
 			destination.PortfolioName = PortfolioName;
 			destination.Currency = Currency;
 			destination.BoardCode = BoardCode;
-			destination.OriginalTransactionId = OriginalTransactionId;
 			destination.IsSubscribe = IsSubscribe;
 			//destination.State = State;
 			destination.TransactionId = TransactionId;
 			destination.ClientCode = ClientCode;
-
-			this.CopyExtensionInfo(destination);
-
-			return destination;
+			destination.From = From;
+			destination.To = To;
+			destination.Skip = Skip;
+			destination.Count = Count;
 		}
 	}
 }

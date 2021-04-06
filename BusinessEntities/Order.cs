@@ -18,6 +18,7 @@ namespace StockSharp.BusinessEntities
 	using System;
 	using System.Collections.Generic;
 	using System.ComponentModel;
+	using System.ComponentModel.DataAnnotations;
 	using System.Runtime.Serialization;
 	using System.Xml.Serialization;
 
@@ -51,9 +52,12 @@ namespace StockSharp.BusinessEntities
 		/// Time taken to register an order.
 		/// </summary>
 		[TimeSpan]
-		[DisplayNameLoc(LocalizedStrings.Str517Key)]
-		[DescriptionLoc(LocalizedStrings.Str518Key)]
-		[StatisticsCategory]
+		[Display(
+			ResourceType = typeof(LocalizedStrings),
+			Name = LocalizedStrings.Str538Key,
+			Description = LocalizedStrings.Str518Key,
+			GroupName = LocalizedStrings.Str161Key,
+			Order = 1000)]
 		[Nullable]
 		public TimeSpan? LatencyRegistration
 		{
@@ -64,7 +68,7 @@ namespace StockSharp.BusinessEntities
 					return;
 
 				_latencyRegistration = value;
-				NotifyChanged(nameof(LatencyRegistration));
+				NotifyChanged();
 			}
 		}
 
@@ -74,9 +78,12 @@ namespace StockSharp.BusinessEntities
 		/// Time taken to cancel an order.
 		/// </summary>
 		[TimeSpan]
-		[DisplayNameLoc(LocalizedStrings.Str519Key)]
-		[DescriptionLoc(LocalizedStrings.Str520Key)]
-		[StatisticsCategory]
+		[Display(
+			ResourceType = typeof(LocalizedStrings),
+			Name = LocalizedStrings.Str537Key,
+			Description = LocalizedStrings.Str520Key,
+			GroupName = LocalizedStrings.Str161Key,
+			Order = 1001)]
 		[Nullable]
 		public TimeSpan? LatencyCancellation
 		{
@@ -87,7 +94,33 @@ namespace StockSharp.BusinessEntities
 					return;
 
 				_latencyCancellation = value;
-				NotifyChanged(nameof(LatencyCancellation));
+				NotifyChanged();
+			}
+		}
+
+		private TimeSpan? _latencyEdition;
+
+		/// <summary>
+		/// Time taken to edit an order.
+		/// </summary>
+		[TimeSpan]
+		[Display(
+			ResourceType = typeof(LocalizedStrings),
+			Name = LocalizedStrings.EditionKey,
+			Description = LocalizedStrings.EditionLatencyKey,
+			GroupName = LocalizedStrings.Str161Key,
+			Order = 1002)]
+		[Nullable]
+		public TimeSpan? LatencyEdition
+		{
+			get => _latencyEdition;
+			set
+			{
+				if (_latencyEdition == value)
+					return;
+
+				_latencyEdition = value;
+				NotifyChanged();
 			}
 		}
 
@@ -109,7 +142,7 @@ namespace StockSharp.BusinessEntities
 					return;
 
 				_id = value;
-				NotifyChanged(nameof(Id));
+				NotifyChanged();
 			}
 		}
 
@@ -128,7 +161,7 @@ namespace StockSharp.BusinessEntities
 			set
 			{
 				_stringId = value;
-				NotifyChanged(nameof(StringId));
+				NotifyChanged();
 			}
 		}
 
@@ -147,7 +180,7 @@ namespace StockSharp.BusinessEntities
 			set
 			{
 				_boardId = value;
-				NotifyChanged(nameof(BoardId));
+				NotifyChanged();
 			}
 		}
 
@@ -169,12 +202,12 @@ namespace StockSharp.BusinessEntities
 					return;
 
 				_time = value;
-				NotifyChanged(nameof(Time));
+				NotifyChanged();
 			}
 		}
 
 		/// <summary>
-		/// Transaction ID. Automatically set when the <see cref="IConnector.RegisterOrder"/> method called.
+		/// Transaction ID. Automatically set when the <see cref="ITransactionProvider.RegisterOrder"/> method called.
 		/// </summary>
 		[DataMember]
 		[DisplayNameLoc(LocalizedStrings.TransactionKey)]
@@ -211,7 +244,7 @@ namespace StockSharp.BusinessEntities
 					return;
 
 				_state = value;
-				NotifyChanged(nameof(State));
+				NotifyChanged();
 			}
 		}
 
@@ -226,6 +259,7 @@ namespace StockSharp.BusinessEntities
 		public Portfolio Portfolio { get; set; }
 
 		[field: NonSerialized]
+		[Obsolete]
 		private readonly Lazy<SynchronizedList<string>> _messages = new Lazy<SynchronizedList<string>>(() => new SynchronizedList<string>());
 
 		/// <summary>
@@ -236,6 +270,7 @@ namespace StockSharp.BusinessEntities
 		[DisplayNameLoc(LocalizedStrings.Str526Key)]
 		[DescriptionLoc(LocalizedStrings.Str527Key)]
 		[MainCategory]
+		[Obsolete]
 		public ISynchronizedCollection<string> Messages => _messages.Value;
 
 		private DateTimeOffset _lastChangeTime;
@@ -257,7 +292,7 @@ namespace StockSharp.BusinessEntities
 					return;
 
 				_lastChangeTime = value;
-				NotifyChanged(nameof(LastChangeTime));
+				NotifyChanged();
 			}
 		}
 
@@ -279,7 +314,7 @@ namespace StockSharp.BusinessEntities
 					return;
 
 				_localTime = value;
-				NotifyChanged(nameof(LocalTime));
+				NotifyChanged();
 			}
 		}
 
@@ -338,7 +373,7 @@ namespace StockSharp.BusinessEntities
 					return;
 
 				_balance = value;
-				NotifyChanged(nameof(Balance));
+				NotifyChanged();
 			}
 		}
 
@@ -359,7 +394,7 @@ namespace StockSharp.BusinessEntities
 					return;
 
 				_status = value;
-				NotifyChanged(nameof(Status));
+				NotifyChanged();
 			}
 		}
 
@@ -382,7 +417,7 @@ namespace StockSharp.BusinessEntities
 					return;
 
 				_isSystem = value;
-				NotifyChanged(nameof(IsSystem));
+				NotifyChanged();
 			}
 		}
 
@@ -426,7 +461,7 @@ namespace StockSharp.BusinessEntities
 					return;
 
 				_expiryDate = value;
-				NotifyChanged(nameof(ExpiryDate));
+				NotifyChanged();
 			}
 		}
 
@@ -473,49 +508,27 @@ namespace StockSharp.BusinessEntities
 					return;
 
 				_derivedOrder = value;
-				NotifyChanged(nameof(DerivedOrder));
+				NotifyChanged();
 			}
 		}
-
-		/// <summary>
-		/// Information for REPO\REPO-M orders.
-		/// </summary>
-		[Ignore]
-		[DisplayNameLoc(LocalizedStrings.Str233Key)]
-		[DescriptionLoc(LocalizedStrings.Str234Key)]
-		[MainCategory]
-		public RepoOrderInfo RepoInfo { get; set; }
-
-		/// <summary>
-		/// Information for Negotiate Deals Mode orders.
-		/// </summary>
-		[Ignore]
-		[DisplayNameLoc(LocalizedStrings.Str235Key)]
-		[DescriptionLoc(LocalizedStrings.Str236Key)]
-		[MainCategory]
-		public RpsOrderInfo RpsInfo { get; set; }
 
 		[field: NonSerialized]
 		private SynchronizedDictionary<string, object> _extensionInfo;
 
-		/// <summary>
-		/// Extended information on order.
-		/// </summary>
-		/// <remarks>
-		/// Required if additional information associated with the order is stored in the program. For example, the activation time, the yield for usual orders or the condition order ID for a stop order.
-		/// </remarks>
+		/// <inheritdoc />
 		[Ignore]
 		[XmlIgnore]
 		[DisplayNameLoc(LocalizedStrings.ExtendedInfoKey)]
 		[DescriptionLoc(LocalizedStrings.Str427Key)]
 		[MainCategory]
+		[Obsolete]
 		public IDictionary<string, object> ExtensionInfo
 		{
 			get => _extensionInfo;
 			set
 			{
 				_extensionInfo = value.Sync();
-				NotifyChanged(nameof(ExtensionInfo));
+				NotifyChanged();
 			}
 		}
 
@@ -534,30 +547,6 @@ namespace StockSharp.BusinessEntities
 		/// </summary>
 		public string CommissionCurrency { get; set; }
 
-		//[field: NonSerialized]
-		//private IConnector _connector;
-
-		///// <summary>
-		///// Connection to the trading system, through which this order has been registered.
-		///// </summary>
-		//[Ignore]
-		//[XmlIgnore]
-		//[Browsable(false)]
-		//[Obsolete("The property Connector was obsoleted and is always null.")]
-		//public IConnector Connector
-		//{
-		//	get { return _connector; }
-		//	set
-		//	{
-		//		if (_connector == value)
-		//			return;
-
-		//		_connector = value;
-
-		//		NotifyChanged(nameof(Connector));
-		//	}
-		//}
-
 		/// <summary>
 		/// User's order ID.
 		/// </summary>
@@ -566,6 +555,12 @@ namespace StockSharp.BusinessEntities
 		[DescriptionLoc(LocalizedStrings.Str166Key)]
 		[MainCategory]
 		public string UserOrderId { get; set; }
+
+		/// <summary>
+		/// Strategy id.
+		/// </summary>
+		[DataMember]
+		public string StrategyId { get; set; }
 
 		/// <summary>
 		/// Broker firm code.
@@ -620,13 +615,93 @@ namespace StockSharp.BusinessEntities
 		public decimal? Slippage { get; set; }
 
 		/// <summary>
-		/// Returns a string that represents the current object.
+		/// Is order manual.
 		/// </summary>
-		/// <returns>A string that represents the current object.</returns>
+		[DataMember]
+		[DisplayNameLoc(LocalizedStrings.ManualKey)]
+		[DescriptionLoc(LocalizedStrings.IsOrderManualKey)]
+		public bool? IsManual { get; set; }
+
+		/// <summary>
+		/// Average execution price.
+		/// </summary>
+		[DataMember]
+		public decimal? AveragePrice { get; set; }
+
+		/// <summary>
+		/// Yield.
+		/// </summary>
+		[DataMember]
+		public decimal? Yield { get; set; }
+
+		/// <summary>
+		/// Minimum quantity of an order to be executed.
+		/// </summary>
+		[DataMember]
+		public decimal? MinVolume { get; set; }
+
+		/// <summary>
+		/// Position effect.
+		/// </summary>
+		[DataMember]
+		public OrderPositionEffects? PositionEffect { get; set; }
+
+		/// <summary>
+		/// Post-only order.
+		/// </summary>
+		[DataMember]
+		public bool? PostOnly { get; set; }
+
+		/// <summary>
+		/// Sequence number.
+		/// </summary>
+		/// <remarks>Zero means no information.</remarks>
+		[DataMember]
+		public long SeqNum { get; set; }
+
+		/// <summary>
+		/// Margin leverage.
+		/// </summary>
+		[DataMember]
+		[DisplayNameLoc(LocalizedStrings.LeverageKey)]
+		[DescriptionLoc(LocalizedStrings.Str261Key)]
+		[MainCategory]
+		public int? Leverage { get; set; }
+
+		/// <inheritdoc />
 		public override string ToString()
 		{
-			return LocalizedStrings.Str534Params
+			var str = LocalizedStrings.Str534Params
 				.Put(TransactionId, Id == null ? StringId : Id.To<string>(), Security?.Id, Portfolio?.Name, Direction == Sides.Buy ? LocalizedStrings.Str403 : LocalizedStrings.Str404, Price, Volume, State, Balance, Type);
+
+			if (!UserOrderId.IsEmpty())
+				str += $" UID={UserOrderId}";
+
+			if (!StrategyId.IsEmpty())
+				str += $" Strategy={StrategyId}";
+
+			if (Condition != null)
+				str += $" Condition={Condition}";
+
+			if (AveragePrice != null)
+				str += $" AvgPrice={AveragePrice}";
+
+			if (MinVolume != null)
+				str += $" MinVolume={MinVolume}";
+
+			if (PositionEffect != null)
+				str += $" PosEffect={PositionEffect.Value}";
+
+			if (PostOnly != null)
+				str += $",PostOnly={PostOnly.Value}";
+
+			if (SeqNum != 0)
+				str += $",SeqNum={SeqNum}";
+
+			if (Leverage != null)
+				str += $",Leverage={Leverage.Value}";
+
+			return str;
 		}
 	}
 }

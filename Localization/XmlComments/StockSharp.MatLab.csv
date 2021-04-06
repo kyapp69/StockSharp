@@ -22,11 +22,10 @@ T:StockSharp.MatLab.CandleEventArgs/summary;DocStr10815
 P:StockSharp.MatLab.CandleEventArgs.Series/summary;CandlesSeries
 P:StockSharp.MatLab.CandleEventArgs.Candle/summary;DocStr491
 T:StockSharp.MatLab.MatLabConnector/summary;DocStr4036
-M:StockSharp.MatLab.MatLabConnector.#ctor(StockSharp.Algo.Connector)/summary;DocStr1
-M:StockSharp.MatLab.MatLabConnector.#ctor(StockSharp.Algo.Connector)/param/realConnector;DocStr4037
-M:StockSharp.MatLab.MatLabConnector.#ctor(StockSharp.Algo.Connector,System.Boolean)/summary;DocStr1
-M:StockSharp.MatLab.MatLabConnector.#ctor(StockSharp.Algo.Connector,System.Boolean)/param/realConnector;DocStr4037
-M:StockSharp.MatLab.MatLabConnector.#ctor(StockSharp.Algo.Connector,System.Boolean)/param/ownTrader;DocStr2245
+M:StockSharp.MatLab.MatLabConnector.#ctor/summary;DocStr1
+M:StockSharp.MatLab.MatLabConnector.AddAdapter(StockSharp.Messages.IMessageAdapter,System.String)/summary;DocStr12024
+M:StockSharp.MatLab.MatLabConnector.AddAdapter(StockSharp.Messages.IMessageAdapter,System.String)/param/adapter;Adapter
+M:StockSharp.MatLab.MatLabConnector.AddAdapter(StockSharp.Messages.IMessageAdapter,System.String)/param/initString;DocStr12025
 P:StockSharp.MatLab.MatLabConnector.RealConnector/summary;DocStr4037
 E:StockSharp.MatLab.MatLabConnector.Connected/summary;DocStr890
 E:StockSharp.MatLab.MatLabConnector.ConnectionError/summary;DocStr892
@@ -45,10 +44,6 @@ E:StockSharp.MatLab.MatLabConnector.NewOrder/summary;DocStr8548
 E:StockSharp.MatLab.MatLabConnector.OrderChanged/summary;DocStr8549
 E:StockSharp.MatLab.MatLabConnector.OrderRegisterFailed/summary;DocStr8550
 E:StockSharp.MatLab.MatLabConnector.OrderCancelFailed/summary;DocStr8551
-E:StockSharp.MatLab.MatLabConnector.NewStopOrder/summary;DocStr9262
-E:StockSharp.MatLab.MatLabConnector.StopOrderChanged/summary;DocStr9263
-E:StockSharp.MatLab.MatLabConnector.StopOrderRegisterFailed/summary;DocStr9264
-E:StockSharp.MatLab.MatLabConnector.StopOrderCancelFailed/summary;DocStr9265
 E:StockSharp.MatLab.MatLabConnector.NewMarketDepth/summary;DocStr8557
 E:StockSharp.MatLab.MatLabConnector.MarketDepthChanged/summary;DocStr8558
 E:StockSharp.MatLab.MatLabConnector.NewOrderLogItem/summary;DocStr885

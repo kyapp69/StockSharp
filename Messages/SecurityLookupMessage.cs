@@ -16,8 +16,11 @@ Copyright 2010 by StockSharp, LLC
 namespace StockSharp.Messages
 {
 	using System;
-	using System.Collections.Generic;
+    using System.Linq;
+
 	using System.Runtime.Serialization;
+
+	using Ecng.Common;
 
 	using StockSharp.Localization;
 
@@ -26,11 +29,9 @@ namespace StockSharp.Messages
 	/// </summary>
 	[DataContract]
 	[Serializable]
-	public class SecurityLookupMessage : SecurityMessage//, IEquatable<SecurityLookupMessage>
+	public class SecurityLookupMessage : SecurityMessage, ISubscriptionMessage
 	{
-		/// <summary>
-		/// Transaction ID.
-		/// </summary>
+		/// <inheritdoc />
 		[DataMember]
 		[DisplayNameLoc(LocalizedStrings.TransactionKey)]
 		[DescriptionLoc(LocalizedStrings.TransactionIdKey, true)]
@@ -44,7 +45,39 @@ namespace StockSharp.Messages
 		[DisplayNameLoc(LocalizedStrings.TypeKey)]
 		[DescriptionLoc(LocalizedStrings.Str360Key)]
 		[MainCategory]
-		public IEnumerable<SecurityTypes> SecurityTypes { get; set; }
+		public SecurityTypes[] SecurityTypes { get; set; }
+
+		/// <summary>
+		/// Request only <see cref="SecurityMessage.SecurityId"/>.
+		/// </summary>
+		[DataMember]
+		public bool OnlySecurityId { get; set; }
+
+		/// <inheritdoc />
+		[DataMember]
+		public long? Skip { get; set; }
+
+		/// <inheritdoc />
+		[DataMember]
+		public long? Count { get; set; }
+
+		private SecurityId[] _securityIds = ArrayHelper.Empty<SecurityId>();
+
+		/// <summary>
+		/// Security identifiers.
+		/// </summary>
+		[DataMember]
+		public SecurityId[] SecurityIds
+		{
+			get => _securityIds;
+			set => _securityIds = value ?? throw new ArgumentNullException(nameof(value));
+		}
+
+		/// <summary>
+		/// Electronic board code.
+		/// </summary>
+		[DataMember]
+		public string BoardCode { get; set; }
 
 		/// <summary>
 		/// Initializes a new instance of the <see cref="SecurityLookupMessage"/>.
@@ -54,53 +87,92 @@ namespace StockSharp.Messages
 		{
 		}
 
+		DataType ISubscriptionMessage.DataType => DataType.Securities;
+
+		bool ISubscriptionMessage.FilterEnabled
+			=>
+			SecurityType != null || SecurityId != default ||
+			!Name.IsEmpty() || !ShortName.IsEmpty() ||
+			SecurityTypes?.Length > 0 || OptionType != null ||
+			Strike != null || VolumeStep != null || PriceStep != null ||
+			!CfiCode.IsEmpty() || MinVolume != null || MaxVolume != null ||
+			Multiplier != null || Decimals != null || ExpiryDate != null ||
+			SettlementDate != null || IssueDate != null || IssueSize != null ||
+			!UnderlyingSecurityCode.IsEmpty() || UnderlyingSecurityMinVolume != null ||
+			UnderlyingSecurityType != null || !Class.IsEmpty() || Currency != null ||
+			!BinaryOptionType.IsEmpty() || Shortable != null || FaceValue != null || !BoardCode.IsEmpty();
+
 		/// <summary>
 		/// Create a copy of <see cref="SecurityLookupMessage"/>.
 		/// </summary>
 		/// <returns>Copy.</returns>
 		public override Message Clone()
 		{
-			var clone = new SecurityLookupMessage
-			{
-				TransactionId = TransactionId,
-				SecurityTypes = SecurityTypes,
-			};
-			
+			var clone = new SecurityLookupMessage();
 			CopyTo(clone);
-
 			return clone;
 		}
 
-		///// <summary>
-		///// Determines whether the specified criterias are considered equal.
-		///// </summary>
-		///// <param name="other">Another search criteria with which to compare.</param>
-		///// <returns><see langword="true" />, if criterias are equal, otherwise, <see langword="false" />.</returns>
-		//public bool Equals(SecurityLookupMessage other)
-		//{
-		//	if (!SecurityId.IsDefault() && SecurityId.Equals(other.SecurityId))
-		//		return true;
+		/// <summary>
+		/// Copy the message into the <paramref name="destination" />.
+		/// </summary>
+		/// <param name="destination">The object, to which copied information.</param>
+		public void CopyTo(SecurityLookupMessage destination)
+		{
+			if (destination == null)
+				throw new ArgumentNullException(nameof(destination));
 
-		//	if (Name == other.Name && 
-		//		ShortName == other.ShortName && 
-		//		Currency == other.Currency && 
-		//		ExpiryDate == other.ExpiryDate && 
-		//		OptionType == other.OptionType &&
-		//		((SecurityTypes == null && other.SecurityTypes == null) ||
-		//		(SecurityTypes != null && other.SecurityTypes != null && SecurityTypes.SequenceEqual(other.SecurityTypes))) && 
-		//		SettlementDate == other.SettlementDate &&
-		//		BinaryOptionType == other.BinaryOptionType &&
-		//		Strike == other.Strike &&
-		//		UnderlyingSecurityCode == other.UnderlyingSecurityCode && CFICode == other.CFICode)
-		//		return true;
+			destination.TransactionId = TransactionId;
+			destination.SecurityTypes = SecurityTypes?.ToArray();
+			destination.OnlySecurityId = OnlySecurityId;
+			destination.Skip = Skip;
+			destination.Count = Count;
+			destination.SecurityIds = SecurityIds.ToArray();
+			destination.BoardCode = BoardCode;
 
-		//	return false;
-		//}
+			base.CopyTo(destination);
+		}
 
 		/// <inheritdoc />
 		public override string ToString()
 		{
-			return base.ToString() + $",TransId={TransactionId},SecId={SecurityId},Name={Name},SecType={SecurityType},ExpDate={ExpiryDate}";
+			var str = base.ToString() + $",TransId={TransactionId},SecId={SecurityId},Name={Name},SecType={this.GetSecurityTypes().Select(t => t.To<string>()).Join("|")},ExpDate={ExpiryDate}";
+
+			if (Skip != default)
+				str += $",Skip={Skip}";
+
+			if (Count != default)
+				str += $",Cnt={Count}";
+
+			if (OnlySecurityId)
+				str += $",OnlyId={OnlySecurityId}";
+
+			if (SecurityIds.Length > 0)
+				str += $",Ids={SecurityIds.Select(id => id.ToString()).JoinComma()}";
+
+			if (!BoardCode.IsEmpty())
+				str += $",Board={BoardCode}";
+
+			return str;
+		}
+
+		DateTimeOffset? ISubscriptionMessage.From
+		{
+			get => null;
+			set { }
+		}
+
+		DateTimeOffset? ISubscriptionMessage.To
+		{
+			// prevent for online mode
+			get => DateTimeOffset.MaxValue;
+			set { }
+		}
+
+		bool ISubscriptionMessage.IsSubscribe
+		{
+			get => true;
+			set { }
 		}
 	}
 }

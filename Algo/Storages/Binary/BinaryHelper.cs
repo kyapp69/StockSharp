@@ -17,7 +17,6 @@ namespace StockSharp.Algo.Storages.Binary
 {
 	using System;
 	using System.Collections;
-	using System.Text;
 
 	using Ecng.Collections;
 	using Ecng.Common;
@@ -36,29 +35,14 @@ namespace StockSharp.Algo.Storages.Binary
 			if (value != prevValue + diff)
 				throw new ArgumentOutOfRangeException(nameof(value), LocalizedStrings.Str1006Params.Put(value, prevValue));
 
-			writer.Write(diff >= 0);
-
-			if (diff < 0)
-				diff = -diff;
-
-			var decBits = decimal.GetBits(diff);
-
-			writer.WriteInt(decBits[0]);
-			writer.WriteInt(decBits[1]);
-			writer.WriteInt(decBits[2]);
-			writer.WriteInt((decBits[3] >> 16) & 0xff);
+			writer.WriteDecimal(diff);
 
 			return value;
 		}
 
 		public static decimal ReadDecimal(this BitArrayReader reader, decimal prevPrice)
 		{
-			var isPos = reader.Read();
-
-			var diff = new decimal(new[] { reader.ReadInt(), reader.ReadInt(), reader.ReadInt(), reader.ReadInt() << 16 });
-
-			if (!isPos)
-				diff = -diff;
+			var diff = reader.ReadDecimal();
 
 			return prevPrice + diff;
 		}
@@ -152,7 +136,43 @@ namespace StockSharp.Algo.Storages.Binary
 			}
 		}
 
-		public static void WritePriceEx(this BitArrayWriter writer, decimal price, BinaryMetaInfo info, SecurityId securityId, bool useLong = false)
+		private const decimal _largeDecLimit = 792281625142643375935439503.35m;
+
+		private static bool TryWriteLargeDecimal(this BitArrayWriter writer, bool largeDecimal, decimal value)
+		{
+			if (largeDecimal)
+			{
+				if (value.Abs() > _largeDecLimit)
+				{
+					writer.Write(true);
+					writer.WriteDecimal(value);
+					return true;
+				}
+				else
+				{
+					writer.Write(false);
+				}
+			}
+
+			return false;
+		}
+
+		private static bool TryReadLargeDecimal(this BitArrayReader reader, bool largeDecimal, out decimal value)
+		{
+			if (largeDecimal)
+			{
+				if (reader.Read())
+				{
+					value = reader.ReadDecimal();
+					return true;
+				}
+			}
+
+			value = default;
+			return false;
+		}
+
+		public static void WritePriceEx(this BitArrayWriter writer, decimal price, BinaryMetaInfo info, SecurityId securityId, bool useLong, bool largeDecimal)
 		{
 			if (info.Version < MarketDataVersions.Version41)
 			{
@@ -162,6 +182,9 @@ namespace StockSharp.Algo.Storages.Binary
 			}
 			else
 			{
+				if (writer.TryWriteLargeDecimal(largeDecimal, price))
+					return;
+
 				var isAligned = (price % info.LastPriceStep) == 0;
 				writer.Write(isAligned);
 
@@ -205,7 +228,7 @@ namespace StockSharp.Algo.Storages.Binary
 			}
 		}
 
-		public static decimal ReadPriceEx(this BitArrayReader reader, BinaryMetaInfo info, bool useLong = false)
+		public static decimal ReadPriceEx(this BitArrayReader reader, BinaryMetaInfo info, bool useLong, bool largeDecimal)
 		{
 			if (info.Version < MarketDataVersions.Version41)
 			{
@@ -214,6 +237,9 @@ namespace StockSharp.Algo.Storages.Binary
 			}
 			else
 			{
+				if (reader.TryReadLargeDecimal(largeDecimal, out var price))
+					return price;
+
 				if (reader.Read())
 				{
 					var prevPrice = info.FirstPrice;
@@ -280,7 +306,7 @@ namespace StockSharp.Algo.Storages.Binary
 					if (timeDiff <= TimeSpan.FromHours(32))
 					{
 						writer.Write(true);
-						writer.WriteBits(timeDiff.Hours, 5);
+						writer.WriteBits(timeDiff.Days * 24 + timeDiff.Hours, 5);
 					}
 					else
 					{
@@ -414,7 +440,7 @@ namespace StockSharp.Algo.Storages.Binary
 			return (isUtc ? new DateTime(time + offset.Ticks) : prevTime).ApplyTimeZone(offset);
 		}
 
-		public static void WriteVolume(this BitArrayWriter writer, decimal volume, BinaryMetaInfo info, SecurityId securityId)
+		public static void WriteVolume(this BitArrayWriter writer, decimal volume, BinaryMetaInfo info, bool largeDecimal)
 		{
 			if (info.Version < MarketDataVersions.Version44)
 			{
@@ -433,6 +459,9 @@ namespace StockSharp.Algo.Storages.Binary
 			}
 			else
 			{
+				if (writer.TryWriteLargeDecimal(largeDecimal, volume))
+					return;
+
 				var isAligned = (volume % info.VolumeStep) == 0;
 				writer.Write(isAligned);
 
@@ -450,7 +479,7 @@ namespace StockSharp.Algo.Storages.Binary
 			}
 		}
 
-		public static decimal ReadVolume(this BitArrayReader reader, BinaryMetaInfo info)
+		public static decimal ReadVolume(this BitArrayReader reader, BinaryMetaInfo info, bool largeDecimal)
 		{
 			if (info.Version < MarketDataVersions.Version44)
 			{
@@ -461,6 +490,9 @@ namespace StockSharp.Algo.Storages.Binary
 			}
 			else
 			{
+				if (reader.TryReadLargeDecimal(largeDecimal, out var volume))
+					return volume;
+
 				if (reader.Read())
 					return reader.ReadLong() * info.VolumeStep;
 				else
@@ -497,7 +529,7 @@ namespace StockSharp.Algo.Storages.Binary
 
 		public static void WriteString(this BitArrayWriter writer, string value)
 		{
-			var bits = Encoding.UTF8.GetBytes(value).To<BitArray>().To<bool[]>();
+			var bits = value.UTF8().To<BitArray>().To<bool[]>();
 			writer.WriteInt(bits.Length);
 			bits.ForEach(writer.Write);
 		}
@@ -510,7 +542,7 @@ namespace StockSharp.Algo.Storages.Binary
 		public static string ReadString(this BitArrayReader reader)
 		{
 			var len = reader.ReadInt();
-			return Encoding.UTF8.GetString(reader.ReadArray(len).To<BitArray>().To<byte[]>());
+			return reader.ReadArray(len).To<BitArray>().To<byte[]>().UTF8();
 		}
 
 		public static TimeSpan GetTimeZone(this BinaryMetaInfo metaInfo, bool isUtc, SecurityId securityId, IExchangeInfoProvider exchangeInfoProvider)
@@ -583,5 +615,119 @@ namespace StockSharp.Algo.Storages.Binary
 		{
 			return reader.Read() ? reader.ReadLong().To<DateTime>().ApplyTimeZone(new TimeSpan(reader.ReadInt(), reader.ReadInt(), 0)) : (DateTimeOffset?)null;
 		}
+
+		public static void WriteBuildFrom(this BitArrayWriter writer, DataType buildFrom)
+		{
+			writer.Write(buildFrom != null);
+
+			if (buildFrom == null)
+				return;
+
+			if (buildFrom == DataType.Level1)
+				writer.WriteInt(0);
+			else if (buildFrom == DataType.MarketDepth)
+				writer.WriteInt(1);
+			else if (buildFrom == DataType.OrderLog)
+				writer.WriteInt(2);
+			else if (buildFrom == DataType.Ticks)
+				writer.WriteInt(3);
+			else if (buildFrom == DataType.Transactions)
+				writer.WriteInt(4);
+			else
+			{
+				writer.WriteInt(5);
+
+				var (messageType, arg1, arg2, arg3) = buildFrom.Extract();
+
+				writer.WriteInt(messageType);
+				writer.WriteLong(arg1);
+
+				if (arg2 == 0)
+					writer.Write(false);
+				else
+				{
+					writer.Write(true);
+					writer.WriteDecimal(arg2, 0);
+				}
+
+				writer.WriteInt(arg3);
+			}
+		}
+
+		public static DataType ReadBuildFrom(this BitArrayReader reader)
+		{
+			if (!reader.Read())
+				return null;
+
+			switch (reader.ReadInt())
+			{
+				case 0:
+					return DataType.Level1;
+				case 1:
+					return DataType.MarketDepth;
+				case 2:
+					return DataType.OrderLog;
+				case 3:
+					return DataType.Ticks;
+				case 4:
+					return DataType.Transactions;
+				case 5:
+					return reader.ReadInt().ToDataType(reader.ReadLong(), reader.Read() ? reader.ReadDecimal(0) : 0M, reader.ReadInt());
+				default:
+					throw new InvalidOperationException();
+			}
+		}
+
+		public static void WriteSeqNum<TMessage>(this BitArrayWriter writer, TMessage message, BinaryMetaInfo metaInfo)
+			where TMessage : ISeqNumMessage
+		{
+			metaInfo.PrevSeqNum = writer.SerializeId(message.SeqNum, metaInfo.PrevSeqNum);
+		}
+
+		public static void ReadSeqNum<TMessage>(this BitArrayReader reader, TMessage message, BinaryMetaInfo metaInfo)
+			where TMessage : ISeqNumMessage
+		{
+			metaInfo.FirstSeqNum += reader.ReadLong();
+			message.SeqNum = metaInfo.FirstSeqNum;
+		}
+
+		public static void WriteNullableBool(this BitArrayWriter writer, bool? value)
+		{
+			writer.Write(value != null);
+
+			if (value is null)
+				return;
+
+			writer.Write(value.Value);
+		}
+
+		public static bool? ReadNullableBool(this BitArrayReader reader)
+			=> reader.Read() ? reader.Read() : (bool?)null;
+
+		public static void WriteNullableSide(this BitArrayWriter writer, Sides? value)
+		{
+			writer.Write(value != null);
+
+			if (value is null)
+				return;
+
+			writer.Write(value.Value == Sides.Buy);
+		}
+
+		public static Sides? ReadNullableSide(this BitArrayReader reader)
+			=> reader.Read() ? reader.Read() ? Sides.Buy : Sides.Sell : (Sides?)null;
+
+		public static void WriteNullableDecimal(this BitArrayWriter writer, decimal? value)
+		{
+			writer.Write(value != null);
+
+			if (value is null)
+				return;
+
+			writer.WriteDecimal(value.Value);
+		}
+
+		public static decimal? ReadNullableDecimal(this BitArrayReader reader)
+			=> reader.Read() ? reader.ReadDecimal() : (decimal?)null;
 	}
 }

@@ -1,60 +1,99 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <topic id="a188710e-7bb7-41b3-8119-6088f2bf1780" revisionNumber="0">
   <developerHowToDocument xmlns="http://ddue.schemas.microsoft.com/authoring/2003/5" xmlns:xlink="http://www.w3.org/1999/xlink">
-
-
     <introduction>
-      <para>
-		  The <codeEntityReference>T:StockSharp.Algo.Connector</codeEntityReference> class realizes in its code the connections monitoring.
-		  Such a tracking is configured through the <codeEntityReference qualifyHint="true">P:StockSharp.Algo.Connector.ReConnectionSettings</codeEntityReference>
-		  property and allows to track the following error scenarios:
+    <title>Visual reconnection settings</title>
+    <para>
+    All connectors provide the ability to configure reconnection in case of disconnection. In the 
+    <link xlink:href="0e99f0d7-9d8a-4bb5-a914-6461677b267b" /> graphic element, it looks like this:
+    </para>
+    
+    <mediaLink><image placement="center" xlink:href="API_GUI_ReconnectionSettings" /></mediaLink>
+    <para><legacyBold>Reconnection properties</legacyBold></para>
+     <list class="bullet">
+	   <listItem>
+	      <legacyBold>Interval </legacyBold> - The interval at which connection attempts will occur.
+		</listItem>
+	   <listItem>
+	      <legacyBold>Initially </legacyBold> - The number of attempts to establish the initial connection if it was not established (timeout, network failure, etc.).
+		</listItem>
+	   <listItem>
+	      <legacyBold>Reconnection </legacyBold> - The number of attempts to reconnect if the connection was disconnected during operation.
+		</listItem>
+        <listItem>
+          <legacyBold>Timeout </legacyBold> - Timeout for successful connection/disconnection.
+		</listItem>
+        <listItem>
+          <legacyBold>Operating mode </legacyBold> - The operating mode during which it is necessary to make connections.
+		</listItem>
+        </list>
+        <title>Code reconnection settings</title>
+      <para>The reconnection mechanism is configured through the <codeEntityReference qualifyHint="true">P:StockSharp.Algo.Connector.ReConnectionSettings</codeEntityReference> 
+		  property and allows you to monitor the following error scenarios:
 
 		</para>
-		<list class="ordered">
+		<list class="bullet">
 			<listItem>
-				It is impossible to establish a connection (no connection, incorrect login-password, etc.). The number of attempts to establish a connection is set
-				through the <codeEntityReference qualifyHint="true">P:StockSharp.Messages.ReConnectionSettings.AttemptCount</codeEntityReference> property. The default
-				is 0, meaning that the mode is disabled. -1 specifies an infinite number of attempts.
+				Unable to establish a connection (no communication, incorrect username/password, etc.). The 
+				<codeEntityReference qualifyHint="true">P:StockSharp.Messages.ReConnectionSettings.AttemptCount</codeEntityReference> 
+				property sets the number of attempts to establish a connection. 
+				By default, it is 0, which means that the mode is disabled. -1 means an infinite number of attempts.
 			</listItem>
 			<listItem>
-				The connection was broken during the working process. The number of attempts to reestablish a connection is set through the 
-				<codeEntityReference qualifyHint="true">P:StockSharp.Messages.ReConnectionSettings.ReAttemptCount</codeEntityReference> property. The default is 100.
-				-1 specifies an infinite number of attempts. 0 – the mode is disabled.
+				The connection was broken during operation. The 
+				<codeEntityReference qualifyHint="true">P:StockSharp.Messages.ReConnectionSettings.ReAttemptCount</codeEntityReference> property 
+				sets the number of attempts to reconnect the connection. By default, it is 100. -1 
+				means an infinite number of attempts. 0 - mode is disabled.
 			</listItem>
-			</list>
+			<listItem>
+				When connecting or disconnecting a connection, the corresponding 
+				<codeEntityReference qualifyHint="true">E:StockSharp.BusinessEntities.IConnector.Connected</codeEntityReference> or 
+				<codeEntityReference qualifyHint="true">E:StockSharp.BusinessEntities.IConnector.Disconnected</codeEntityReference> events may not be received for a long time. For such situations, you can use the 
+				<codeEntityReference qualifyHint="true">P:StockSharp.Messages.ReConnectionSettings.TimeOutInterval</codeEntityReference> 
+				property to set the maximum acceptable timeout for a successful event. If, after this time, 
+				the desired event does not occur, the 
+				<codeEntityReference qualifyHint="true">E:StockSharp.BusinessEntities.IConnector.ConnectionError</codeEntityReference> event is raised with a timeout error.
+			</listItem>
+		</list>
     </introduction>
 
    <procedure>
-      <title>Use of the connection tracking</title>
 
       <steps class="ordered">
         <step>
-          <content>
-			  <para>
-				  For the demonstration the SampleOEC example working with <token>openecry</token> is taken.
-			  </para>
-			  <para>
-				  When creating a gateway, it is necessary to initialize the reconnections mechanism settings through the
-				  <codeEntityReference qualifyHint="true">P:StockSharp.Algo.Connector.ReConnectionSettings</codeEntityReference> property:
+          <content>          	
+			  <para> 
+When creating a gateway, you need to initialize the settings of the reconnection mechanism through the 
+<codeEntityReference qualifyHint="true">P:StockSharp.Algo.Connector.ReConnectionSettings</codeEntityReference> property:
 			  </para>
 			<code language="C#"><![CDATA[
-// tradking interval is 10 seconds
-Trader.ReConnectionSettings.Interval = TimeSpan.FromSeconds(10);
+// initialize the reconnection mechanism (it will automatically connect 
+// every 10 seconds if the gateway loses connection with the server)
+Connector.ReConnectionSettings.Interval = TimeSpan.FromSeconds(10);
 
-Trader.ReConnectionSettings.ConnectionRestored += () => this.GuiAsync(() => MessageBox.Show(this, "Connection was restored."));
-
-// connection was dropped
-Trader.ConnectionError += error => this.Sync(() => MessageBox.Show(this, error.ToString()));]]></code>
+// reconnection will work only during the operation of the RTS exchange
+// (to disable reconnection when there is no trading normally, for example, at night)
+Connector.ReConnectionSettings.WorkingTime = Exchange.Rts.WorkingTime;
+]]></code>
 
           </content>
         </step>
 		<step>
 		  <content>
-			<para>In order to check how the mechanism works, it is possible, for example, turn off your Internet connection:
+			<para>To check how the connection control mechanism works, you can turn off the Internet connection:
+			</para>
+		  </content>
+		</step>
+		<step>
+		  <content>
+			<para>
+Below is the program log, which shows that the application is initially in a connected state, 
+and after turning off the Internet connection, the application tries to reconnect. 			  
+After restoring the Internet connection, the application connection is restored:
 			</para>
 			<para>
 			  <mediaLink>
-				<image placement="center" xlink:href="transactions" />
+				<image placement="center" xlink:href="API_ReconnectionLog" />
 			  </mediaLink>
 			</para>
 		  </content>
@@ -62,21 +101,21 @@ Trader.ConnectionError += error => this.Sync(() => MessageBox.Show(this, error.T
 		<step>
 		  <content>
 			<para>
-			  The program will signal about loss of connection:
+Since several connections can be used in 
+<codeEntityReference>T:StockSharp.Algo.Connector</codeEntityReference>, by default events related to reconnection, such as 
+<codeEntityReference qualifyHint="true">E:StockSharp.Algo.Connector.Restored</codeEntityReference> 
+are not triggered, and connection adapters try to reconnect themselves. For the event to start being raised, you need to set the value of the adapter's 
+<codeEntityReference qualifyHint="true">P:StockSharp.Algo.BasketMessageAdapter.SuppressReconnectingErrors</codeEntityReference> property to <legacyBold>false</legacyBold>.
 			</para>
+						<code language="C#"><![CDATA[
+Connector.Adapter.SuppressReconnectingErrors = false;
+Connector.ConnectionError += error => this.Sync(() => MessageBox.Show(this, "Connection lost"));
+Connector.Restored += () => this.Sync(() => MessageBox.Show(this, "Connection restored"));
+]]></code>
 			<para>
 			  <mediaLink>
 				<image placement="center" xlink:href="sampleconnectionerror" />
 			  </mediaLink>
-			</para>
-		  </content>
-		</step>
-		<step>
-		  <content>
-			<para>
-			  Once the external transactions turned on, the program will display a message about the successful reconnection:
-			</para>
-			<para>
 			  <mediaLink>
 				<image placement="center" xlink:href="sampleconnectionrestore" />
 			  </mediaLink>
@@ -84,9 +123,6 @@ Trader.ConnectionError += error => this.Sync(() => MessageBox.Show(this, error.T
 		  </content>
 		</step>
       </steps>
-    </procedure>
-
-	
-    
+    </procedure>    
   </developerHowToDocument>
 </topic>

@@ -4,14 +4,14 @@
     <introduction>
 <para>Для экспорта данных в файлы форматов TSLab и MetaStock необходимо из раскрывающегося списка выбрать формат Txt:</para>
     	<mediaLink>
-    		<image placement="center" xlink:href="hydra_export" />
+    		<image placement="center" xlink:href="hydra_export_JSON" />
     	</mediaLink>
 
     	<para>
     	При экспорте в файлы текстового формата (Txt) появляется окно: 
     	</para>
     	<mediaLink>
-    		<image placement="center" xlink:href="hyda_export_TSLab_MetaStock" />
+    		<image placement="center" xlink:href="hydra_export_TSLab_MetaStock_2" />
     	</mediaLink>
     	    	<para>
     	В котором необходимо указать шаблон экспорта, где в фигурных скобках указаны свойства, которые необходимо экспортировать, и их порядок:
@@ -19,11 +19,13 @@
     	
         <code >
 <![CDATA[
-{SecurityId.SecurityCode},5,{OpenTime:yyyyMMdd},{OpenTime:HHmmss},{OpenPrice},{HighPrice},{LowPrice},{ClosePrice},{TotalVolume}
+{SecurityId.SecurityCode},5,{OpenTime:yyyyMMdd},{OpenTime:default:HH:mm:ss},{OpenPrice},{HighPrice},{LowPrice},{ClosePrice},{TotalVolume}
 	  				]]>
 				   </code>    	  	
     	    	<para>
     	В примере на втором месте указан тайм фрейм свечей в 5 минут.
+    	Если необходимо экспортировать в формате с использованием двоеточий, то необходимо указать ключевое слово 
+<legacyBold>default</legacyBold> как в примере выше <legacyBold>{OpenTime:default:HH:mm:ss}</legacyBold>.
     	</para>
 
     	    	<para>

@@ -62,7 +62,7 @@ namespace StockSharp.BusinessEntities
 			set
 			{
 				_sedol = value;
-				NotifyChanged(nameof(Sedol));
+				NotifyChanged();
 			}
 		}
 
@@ -78,7 +78,7 @@ namespace StockSharp.BusinessEntities
 			set
 			{
 				_cusip = value;
-				NotifyChanged(nameof(Cusip));
+				NotifyChanged();
 			}
 		}
 
@@ -94,7 +94,7 @@ namespace StockSharp.BusinessEntities
 			set
 			{
 				_isin = value;
-				NotifyChanged(nameof(Isin));
+				NotifyChanged();
 			}
 		}
 
@@ -110,7 +110,7 @@ namespace StockSharp.BusinessEntities
 			set
 			{
 				_ric = value;
-				NotifyChanged(nameof(Ric));
+				NotifyChanged();
 			}
 		}
 
@@ -126,7 +126,7 @@ namespace StockSharp.BusinessEntities
 			set
 			{
 				_bloomberg = value;
-				NotifyChanged(nameof(Bloomberg));
+				NotifyChanged();
 			}
 		}
 
@@ -142,7 +142,7 @@ namespace StockSharp.BusinessEntities
 			set
 			{
 				_iqFeed = value;
-				NotifyChanged(nameof(IQFeed));
+				NotifyChanged();
 			}
 		}
 
@@ -159,7 +159,7 @@ namespace StockSharp.BusinessEntities
 			set
 			{
 				_interactiveBrokers = value;
-				NotifyChanged(nameof(InteractiveBrokers));
+				NotifyChanged();
 			}
 		}
 
@@ -175,7 +175,7 @@ namespace StockSharp.BusinessEntities
 			set
 			{
 				_plaza = value;
-				NotifyChanged(nameof(Plaza));
+				NotifyChanged();
 			}
 		}
 
@@ -198,57 +198,46 @@ namespace StockSharp.BusinessEntities
 			};
 		}
 
-		/// <summary>
-		/// Creates a new object that is a copy of the current instance.
-		/// </summary>
-		/// <returns>
-		/// A new object that is a copy of this instance.
-		/// </returns>
+		/// <inheritdoc />
 		object ICloneable.Clone()
 		{
 			return Clone();
 		}
 
-		/// <summary>
-		/// Returns a string that represents the current object.
-		/// </summary>
-		/// <returns>A string that represents the current object.</returns>
+		/// <inheritdoc />
 		public override string ToString()
 		{
 			var str = string.Empty;
 
 			if (!Bloomberg.IsEmpty())
-				str += " Bloom {0}".Put(Bloomberg);
+				str += $" Bloom {Bloomberg}";
 
 			if (!Cusip.IsEmpty())
-				str += " CUSIP {0}".Put(Cusip);
+				str += $" CUSIP {Cusip}";
 
 			if (!IQFeed.IsEmpty())
-				str += " IQFeed {0}".Put(IQFeed);
+				str += $" IQFeed {IQFeed}";
 
 			if (!Isin.IsEmpty())
-				str += " ISIN {0}".Put(Isin);
+				str += $" ISIN {Isin}";
 
 			if (!Ric.IsEmpty())
-				str += " RIC {0}".Put(Ric);
+				str += $" RIC {Ric}";
 
 			if (!Sedol.IsEmpty())
-				str += " SEDOL {0}".Put(Sedol);
+				str += $" SEDOL {Sedol}";
 
 			if (InteractiveBrokers != null)
-				str += " InteractiveBrokers {0}".Put(InteractiveBrokers);
+				str += $" InteractiveBrokers {InteractiveBrokers}";
 
 			if (!Plaza.IsEmpty())
-				str += " Plaza {0}".Put(Plaza);
+				str += $" Plaza {Plaza}";
 
 			return str;
 		}
 
 		/// <inheritdoc />
-		public override int GetHashCode()
-		{
-			return base.GetHashCode();
-		}
+		public override int GetHashCode() => base.GetHashCode();
 
 		/// <summary>
 		/// Compare <see cref="SecurityExternalId"/> on the equivalence.
@@ -263,7 +252,7 @@ namespace StockSharp.BusinessEntities
 		/// <inheritdoc />
 		public bool Equals(SecurityExternalId other)
 		{
-			if (ReferenceEquals(other, null))
+			if (other is null)
 				return false;
 
 			if (Bloomberg != other.Bloomberg)

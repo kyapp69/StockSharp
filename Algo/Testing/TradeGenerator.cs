@@ -38,10 +38,8 @@ namespace StockSharp.Algo.Testing
 			IdGenerator = new IncrementalIdGenerator();
 		}
 
-		/// <summary>
-		/// Market data type.
-		/// </summary>
-		public override MarketDataTypes DataType => MarketDataTypes.Trades;
+		/// <inheritdoc />
+		public override DataType DataType => DataType.Ticks;
 
 		private IdGenerator _idGenerator;
 
@@ -71,16 +69,20 @@ namespace StockSharp.Algo.Testing
 		{
 		}
 
+		/// <inheritdoc />
+		public override void Init()
+		{
+			base.Init();
+
+			_lastTradePrice = default;
+		}
+
 		/// <summary>
 		/// To generate the value for <see cref="ExecutionMessage.OriginSide"/>. By default is disabled.
 		/// </summary>
 		public bool GenerateOriginSide { get; set; }
 
-		/// <summary>
-		/// Process message.
-		/// </summary>
-		/// <param name="message">Message.</param>
-		/// <returns>The result of processing. If <see langword="null" /> is returned, then generator has no sufficient data to generate new message.</returns>
+		/// <inheritdoc />
 		protected override Message OnProcess(Message message)
 		{
 			DateTimeOffset time;
@@ -93,10 +95,10 @@ namespace StockSharp.Algo.Testing
 				{
 					var l1Msg = (Level1ChangeMessage)message;
 
-					var value = l1Msg.Changes.TryGetValue(Level1Fields.LastTradePrice);
+					var value = l1Msg.TryGetDecimal(Level1Fields.LastTradePrice);
 
 					if (value != null)
-						_lastTradePrice = (decimal)value;
+						_lastTradePrice = value.Value;
 
 					time = l1Msg.ServerTime;
 
@@ -163,20 +165,15 @@ namespace StockSharp.Algo.Testing
 		/// <returns>Copy.</returns>
 		public override MarketDataGenerator Clone()
 		{
-			return new RandomWalkTradeGenerator(SecurityId)
+			var clone = new RandomWalkTradeGenerator(SecurityId)
 			{
-				_lastTradePrice = _lastTradePrice,
-
-				MaxVolume = MaxVolume,
-				MinVolume = MinVolume,
-				MaxPriceStepCount = MaxPriceStepCount,
-				Interval = Interval,
-				Volumes = Volumes,
-				Steps = Steps,
-
 				GenerateOriginSide = GenerateOriginSide,
 				IdGenerator = IdGenerator
 			};
+
+			CopyTo(clone);
+
+			return clone;
 		}
 	}
 }

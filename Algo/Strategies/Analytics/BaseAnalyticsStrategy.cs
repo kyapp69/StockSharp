@@ -23,7 +23,6 @@ namespace StockSharp.Algo.Strategies.Analytics
 
 	using StockSharp.Algo.Storages;
 	using StockSharp.BusinessEntities;
-	using StockSharp.Logging;
 	using StockSharp.Localization;
 
 	/// <summary>
@@ -72,6 +71,7 @@ namespace StockSharp.Algo.Strategies.Analytics
 			Description = LocalizedStrings.Str1222Key,
 			GroupName = LocalizedStrings.AnalyticsKey,
 			Order = 0)]
+		[Browsable(false)]
 		public DateTime From
 		{
 			get => _from.Value;
@@ -89,6 +89,7 @@ namespace StockSharp.Algo.Strategies.Analytics
 			Description = LocalizedStrings.Str345Key + LocalizedStrings.Dot,
 			GroupName = LocalizedStrings.AnalyticsKey,
 			Order = 1)]
+		[Browsable(false)]
 		public DateTime To
 		{
 			get => _to.Value;
@@ -105,7 +106,8 @@ namespace StockSharp.Algo.Strategies.Analytics
 			Name = LocalizedStrings.Str1738Key,
 			Description = LocalizedStrings.ResultTypeKey + LocalizedStrings.Dot,
 			GroupName = LocalizedStrings.AnalyticsKey,
-			Order = 1)]
+			Order = 2)]
+		[Browsable(false)]
 		public AnalyticsResultTypes ResultType
 		{
 			get => _resultType.Value;
@@ -126,6 +128,70 @@ namespace StockSharp.Algo.Strategies.Analytics
 			set => base.Portfolio = value;
 		}
 
+		/// <inheritdoc />
+		[Browsable(false)]
+		public override decimal Volume
+		{
+			get => base.Volume;
+			set => base.Volume = value;
+		}
+
+		/// <inheritdoc />
+		[Browsable(false)]
+		public override StrategyCommentModes CommentMode
+		{
+			get => base.CommentMode;
+			set => base.CommentMode = value;
+		}
+
+		/// <inheritdoc />
+		[Browsable(false)]
+		public override bool AllowTrading
+		{
+			get => base.AllowTrading;
+			set => base.AllowTrading = value;
+		}
+
+		/// <inheritdoc />
+		[Browsable(false)]
+		public override bool UnsubscribeOnStop
+		{
+			get => base.UnsubscribeOnStop;
+			set => base.UnsubscribeOnStop = value;
+		}
+
+		/// <inheritdoc />
+		[Browsable(false)]
+		public override int MaxOrderRegisterErrorCount
+		{
+			get => base.MaxOrderRegisterErrorCount;
+			set => base.MaxOrderRegisterErrorCount = value;
+		}
+
+		/// <inheritdoc />
+		[Browsable(false)]
+		public override bool WaitRulesOnStop
+		{
+			get => base.WaitRulesOnStop;
+			set => base.WaitRulesOnStop = value;
+		}
+
+		/// <inheritdoc />
+		[Browsable(false)]
+		public override int MaxRegisterCount
+		{
+			get => base.MaxRegisterCount;
+			set => base.MaxRegisterCount = value;
+		}
+
+		/// <inheritdoc />
+		[Browsable(false)]
+		public override TimeSpan RegisterInterval
+		{
+			get => base.RegisterInterval;
+			set => base.RegisterInterval = value;
+		}
+
 		/// <summary>
 		/// Initialize <see cref="BaseAnalyticsStrategy"/>.
 		/// </summary>
@@ -136,17 +202,10 @@ namespace StockSharp.Algo.Strategies.Analytics
 			_resultType = this.Param(nameof(ResultType), AnalyticsResultTypes.Bubble);
 		}
 
-		/// <summary>
-		/// To cancel all active orders (to stop and regular).
-		/// </summary>
+		/// <inheritdoc />
 		protected override void ProcessCancelActiveOrders()
 		{
 		}
-
-		/// <summary>
-		/// Current time, which will be passed to the <see cref="LogMessage.Time"/>.
-		/// </summary>
-		public override DateTimeOffset CurrentTime => TimeHelper.NowWithOffset;
 
 		/// <summary>
 		/// Result panel.
@@ -158,9 +217,7 @@ namespace StockSharp.Algo.Strategies.Analytics
 		/// </summary>
 		protected StorageFormats StorageFormat => Environment.GetValue<StorageFormats>(nameof(StorageFormat));
 
-		/// <summary>
-		/// The method is called when the <see cref="Strategy.Start"/> method has been called and the <see cref="Strategy.ProcessState"/> state has been taken the <see cref="ProcessStates.Started"/> value.
-		/// </summary>
+		/// <inheritdoc />
 		protected override void OnStarted()
 		{
 			InitStartValues();

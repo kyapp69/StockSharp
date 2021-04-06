@@ -1,7 +1,6 @@
 namespace StockSharp.Algo.Strategies
 {
 	using System;
-	using System.Collections.Generic;
 
 	using Ecng.Common;
 
@@ -20,7 +19,7 @@ namespace StockSharp.Algo.Strategies
 		/// <param name="name">Parameter name.</param>
 		/// <param name="initialValue">The initial value.</param>
 		/// <returns>The strategy parameter.</returns>
-		public static StrategyParam<T> Param<T>(this Strategy strategy, string name, T initialValue = default(T))
+		public static StrategyParam<T> Param<T>(this Strategy strategy, string name, T initialValue = default)
 		{
 			return new StrategyParam<T>(strategy, name, initialValue);
 		}
@@ -34,13 +33,13 @@ namespace StockSharp.Algo.Strategies
 		/// <param name="name">Parameter name.</param>
 		/// <param name="initialValue">The initial value.</param>
 		/// <returns>The strategy parameter.</returns>
-		public static StrategyParam<T> Param<T>(this Strategy strategy, string id, string name, T initialValue = default(T))
+		public static StrategyParam<T> Param<T>(this Strategy strategy, string id, string name, T initialValue = default)
 		{
 			return new StrategyParam<T>(strategy, id, name, initialValue);
 		}
 
 		/// <summary>
-		/// Initializes a new instance of the <see cref="StrategyParam{T}"/>.
+		/// Fill optimization parameters.
 		/// </summary>
 		/// <typeparam name="T">The type of the parameter value.</typeparam>
 		/// <param name="param">The strategy parameter.</param>
@@ -48,7 +47,7 @@ namespace StockSharp.Algo.Strategies
 		/// <param name="optimizeTo">The To value at optimization.</param>
 		/// <param name="optimizeStep">The Increment value at optimization.</param>
 		/// <returns>The strategy parameter.</returns>
-		public static StrategyParam<T> Optimize<T>(this StrategyParam<T> param, T optimizeFrom = default(T), T optimizeTo = default(T), T optimizeStep = default(T))
+		public static StrategyParam<T> Optimize<T>(this StrategyParam<T> param, T optimizeFrom = default, T optimizeTo = default, T optimizeStep = default)
 		{
 			if (param == null)
 				throw new ArgumentNullException(nameof(param));
@@ -63,20 +62,14 @@ namespace StockSharp.Algo.Strategies
 		/// <summary>
 		/// Check can optimize parameter.
 		/// </summary>
-		/// <param name="parameter">Strategy parameter.</param>
-		/// <param name="excludeParameters">Excluded parameters.</param>
+		/// <param name="type">The type of the parameter value.</param>
 		/// <returns><see langword="true" />, if can optimize the parameter, otherwise, <see langword="false" />.</returns>
-		public static bool CanOptimize(this IStrategyParam parameter, ISet<string> excludeParameters)
+		public static bool CanOptimize(this Type type)
 		{
-			if (parameter == null)
-				throw new ArgumentNullException(nameof(parameter));
+			if (type is null)
+				throw new ArgumentNullException(nameof(type));
 
-			if (excludeParameters == null)
-				throw new ArgumentNullException(nameof(excludeParameters));
-
-			var type = parameter.Value.GetType();
-
-			return (type.IsNumeric() && !type.IsEnum() || type == typeof(Unit)) && !excludeParameters.Contains(parameter.Name);
+			return type.IsNumeric() && !type.IsEnum() || type == typeof(Unit);
 		}
 	}
 }

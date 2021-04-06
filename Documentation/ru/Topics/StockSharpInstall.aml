@@ -2,11 +2,22 @@
 <topic id="b9f672db-e0c9-4208-9759-179e5de17fd8" revisionNumber="1">
   <developerConceptualDocument xmlns="http://ddue.schemas.microsoft.com/authoring/2003/5" xmlns:xlink="http://www.w3.org/1999/xlink">
     <introduction>
+    	<para>Начиная с версии 5.0, вся установка производится через NuGet. Подробнее, <externalLink>
+		<linkText>Установка S#.API</linkText>
+			<linkAlternateText>Установка S#.API</linkAlternateText>
+			<linkUri>https://stocksharp.ru/news/265/rukovodstvo-po-nuget/</linkUri>
+			<linkTarget>_blank</linkTarget>
+		</externalLink>
+    	</para>
+    	
+    	<alert class="caution">
+		  <para>Информация ниже актуальна только для версий 4.XXX</para>
+		</alert>
     
       <para>Существуют два способа установки <token>stocksharp</token>:</para>
 		<list class="ordered">
   			<listItem>
-  				<para>Установка из репозитория <token>stocksharpgithub</token> с веб-сервиса <token>github</token>.</para>
+  				<para>Установка из репозитория <token>stocksharpgithubreleases</token> с веб-сервиса <token>github</token>.</para>
   			</listItem>
   			<listItem>
   				<para>Установка из Visual Studio при помощи сервиса Nuget.</para>
@@ -90,7 +101,7 @@
      	 <externalLink>
 		<linkText>Видео - "Установка StockSharp"</linkText>
 			<linkAlternateText>Установка StockSharp</linkAlternateText>
-			<linkUri>http://youtube.com/watch?v=9YThBGMeVKE</linkUri>
+			<linkUri>https://youtu.be/9YThBGMeVKE</linkUri>
 			<linkTarget>_blank</linkTarget>
 		</externalLink>
  

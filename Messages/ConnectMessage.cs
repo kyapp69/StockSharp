@@ -23,7 +23,7 @@ namespace StockSharp.Messages
 	/// </summary>
 	[DataContract]
 	[Serializable]
-	public class ConnectMessage : BaseConnectionMessage
+	public class ConnectMessage : BaseConnectionMessage, IServerTimeMessage
 	{
 		/// <summary>
 		/// Initializes a new instance of the <see cref="ConnectMessage"/>.
@@ -34,16 +34,44 @@ namespace StockSharp.Messages
 		}
 
 		/// <summary>
+		/// Client app version.
+		/// </summary>
+		[DataMember]
+		public string ClientVersion { get; set; }
+
+		/// <summary>
+		/// Optional server session id.
+		/// </summary>
+		[DataMember]
+		public string SessionId { get; set; }
+
+		/// <summary>
+		/// Language.
+		/// </summary>
+		[DataMember]
+		public string Language { get; set; }
+
+		/// <summary>
 		/// Create a copy of <see cref="ConnectMessage"/>.
 		/// </summary>
 		/// <returns>Copy.</returns>
 		public override Message Clone()
 		{
-			return new ConnectMessage
+			var clone = new ConnectMessage
 			{
-				Error = Error,
-				LocalTime = LocalTime,
+				ClientVersion = ClientVersion,
+				SessionId = SessionId,
+				Language = Language,
 			};
+
+			CopyTo(clone);
+			return clone;
+		}
+
+		DateTimeOffset IServerTimeMessage.ServerTime
+		{
+			get => LocalTime;
+			set => LocalTime = value;
 		}
 	}
 }

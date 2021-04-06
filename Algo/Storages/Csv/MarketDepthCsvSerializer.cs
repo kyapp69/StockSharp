@@ -9,6 +9,7 @@ namespace StockSharp.Algo.Storages.Csv
 	using Ecng.Common;
 
 	using StockSharp.Messages;
+	using StockSharp.Localization;
 
 	class MarketDepthCsvSerializer : CsvMarketDataSerializer<QuoteChangeMessage>
 	{
@@ -42,6 +43,18 @@ namespace StockSharp.Algo.Storages.Csv
 
 					Sides? side = null;
 
+					var bids = new List<QuoteChange>();
+					var asks = new List<QuoteChange>();
+
+					var hasPos = false;
+
+					void Flush()
+					{
+						Current.Bids = bids.ToArray();
+						Current.Asks = asks.ToArray();
+						Current.HasPositions = hasPos;
+					}
+
 					do
 					{
 						var quote = _enumerator.Current;
@@ -56,9 +69,9 @@ namespace StockSharp.Algo.Storages.Csv
 								SecurityId = _securityId,
 								ServerTime = quote.ServerTime,
 								LocalTime = quote.LocalTime,
-								Bids = new List<QuoteChange>(),
-								Asks = new List<QuoteChange>(),
-								IsSorted = true,
+								State = quote.State,
+								BuildFrom = quote.BuildFrom,
+								SeqNum = quote.SeqNum ?? 0L,
 							};
 						}
 						else if (Current.ServerTime != quote.ServerTime || (side == Sides.Sell && quote.Side == Sides.Buy))
@@ -66,15 +79,21 @@ namespace StockSharp.Algo.Storages.Csv
 							_resetCurrent = true;
 							_needMoveNext = false;
 
+							Flush();
 							return true;
 						}
 
 						side = quote.Side;
 
-						if (quote.Price != null)
+						if (quote.Quote != null)
 						{
-							var quotes = (List<QuoteChange>)(quote.Side == Sides.Buy ? Current.Bids : Current.Asks);
-							quotes.Add(new QuoteChange(quote.Side, quote.Price.Value, quote.Volume));
+							var qq = quote.Quote.Value;
+
+							if (qq.StartPosition != default || qq.EndPosition != default)
+								hasPos = true;
+
+							var quotes = quote.Side == Sides.Buy ? bids : asks;
+							quotes.Add(new QuoteChange(qq.Price, qq.Volume, qq.OrdersCount, qq.Condition));
 						}
 					}
 					while (_enumerator.MoveNext());
@@ -84,6 +103,8 @@ namespace StockSharp.Algo.Storages.Csv
 
 					_resetCurrent = true;
 					_needMoveNext = true;
+
+					Flush();
 					return true;
 				}
 
@@ -125,13 +146,47 @@ namespace StockSharp.Algo.Storages.Csv
 			return _quoteSerializer.CreateMetaInfo(date);
 		}
 
+		private NullableTimeQuoteChange ToNullQuote(Sides side, QuoteChange quote, QuoteChangeMessage message)
+		{
+			if (message is null)
+				throw new ArgumentNullException(nameof(message));
+
+			return new NullableTimeQuoteChange
+			{
+				ServerTime = message.ServerTime,
+				LocalTime = message.LocalTime,
+				Side = side,
+				State = message.State,
+				Quote = quote,
+				BuildFrom = message.BuildFrom,
+				SeqNum = message.SeqNum.DefaultAsNull(),
+			};
+		}
+
 		public override void Serialize(Stream stream, IEnumerable<QuoteChangeMessage> data, IMarketDataMetaInfo metaInfo)
 		{
+			var csvInfo = (CsvMetaInfo)metaInfo;
+			var incOnly = csvInfo.IncrementalOnly;
+
 			var list = data.SelectMany(d =>
 			{
+				if (incOnly != null)
+				{
+					if (incOnly.Value)
+					{
+						if (d.State == null)
+							throw new InvalidOperationException(LocalizedStrings.StorageRequiredIncremental.Put(true));
+					}
+					else
+					{
+						if (d.State != null)
+							throw new InvalidOperationException(LocalizedStrings.StorageRequiredIncremental.Put(false));
+					}
+				}
+
 				var items = new List<NullableTimeQuoteChange>();
 
-				items.AddRange(d.Bids.OrderByDescending(q => q.Price).Select(q => new NullableTimeQuoteChange(q, d)));
+				items.AddRange(d.Bids.OrderByDescending(q => q.Price).Select(q => ToNullQuote(Sides.Buy, q, d)));
 
 				if (items.Count == 0)
 				{
@@ -139,12 +194,15 @@ namespace StockSharp.Algo.Storages.Csv
 					{
 						Side = Sides.Buy,
 						ServerTime = d.ServerTime,
+						State = d.State,
+						BuildFrom = d.BuildFrom,
+						SeqNum = d.SeqNum.DefaultAsNull(),
 					});
 				}
 
 				var bidsCount = items.Count;
 
-				items.AddRange(d.Asks.OrderBy(q => q.Price).Select(q => new NullableTimeQuoteChange(q, d)));
+				items.AddRange(d.Asks.OrderBy(q => q.Price).Select(q => ToNullQuote(Sides.Sell, q, d)));
 
 				if (items.Count == bidsCount)
 				{
@@ -152,6 +210,9 @@ namespace StockSharp.Algo.Storages.Csv
 					{
 						Side = Sides.Sell,
 						ServerTime = d.ServerTime,
+						State = d.State,
+						BuildFrom = d.BuildFrom,
+						SeqNum = d.SeqNum.DefaultAsNull(),
 					});
 				}
 

@@ -37,12 +37,7 @@ namespace StockSharp.Algo.Storages.Csv
 		{
 		}
 
-		/// <summary>
-		/// Write data to the specified writer.
-		/// </summary>
-		/// <param name="writer">CSV writer.</param>
-		/// <param name="data">Data.</param>
-		/// <param name="metaInfo">Meta-information on data for one day.</param>
+		/// <inheritdoc />
 		protected override void Write(CsvFileWriter writer, ExecutionMessage data, IMarketDataMetaInfo metaInfo)
 		{
 			var row = new[]
@@ -59,11 +54,11 @@ namespace StockSharp.Algo.Storages.Csv
 				data.OrderVolume.ToString(),
 				data.Balance.ToString(),
 				data.VisibleVolume.ToString(),
-				data.Side.ToString(),
-				data.OriginSide.ToString(),
-				data.OrderState.ToString(),
-				data.OrderType.ToString(),
-				data.TimeInForce.ToString(),
+				data.Side.To<int>().ToString(),
+				data.OriginSide.To<int?>().ToString(),
+				data.OrderState.To<int?>().ToString(),
+				data.OrderType.To<int?>().ToString(),
+				data.TimeInForce.To<int?>().ToString(),
 				data.TradeId.ToString(),
 				data.TradeStringId,
 				data.TradePrice.ToString(),
@@ -72,17 +67,17 @@ namespace StockSharp.Algo.Storages.Csv
 				data.ClientCode,
 				data.BrokerCode,
 				data.DepoName,
-				data.IsSystem.ToString(),
-				data.HasOrderInfo.ToString(),
-				data.HasTradeInfo.ToString(),
+				data.IsSystem.To<int?>().ToString(),
+				data.HasOrderInfo.To<int>().ToString(),
+				data.HasTradeInfo.To<int>().ToString(),
 				data.Commission.ToString(),
-				data.Currency.ToString(),
+				data.Currency.To<int?>().ToString(),
 				data.Comment,
 				data.SystemComment,
 				/*data.DerivedOrderId.ToString()*/string.Empty,
 				/*data.DerivedOrderStringId*/string.Empty,
-				data.IsUpTick.ToString(),
-				data.IsCancelled.ToString(),
+				data.IsUpTick.To<int?>().ToString(),
+				/*data.IsCancellation.ToString()*/string.Empty,
 				data.OpenInterest.ToString(),
 				data.PnL.ToString(),
 				data.Position.ToString(),
@@ -96,20 +91,24 @@ namespace StockSharp.Algo.Storages.Csv
 				data.ExpiryDate?.ToString("zzz"),
 				data.LocalTime.WriteTimeMls(),
 				data.LocalTime.ToString("zzz"),
-				data.IsMarketMaker.ToString(),
+				data.IsMarketMaker.To<int?>().ToString(),
 				data.CommissionCurrency,
-			};
+				data.IsMargin.To<int?>().ToString(),
+				data.IsManual.To<int?>().ToString(),
+				data.MinVolume.To<string>(),
+				data.PositionEffect.To<int?>().ToString(),
+				data.PostOnly.To<int?>().ToString(),
+				data.Initiator.To<int?>().ToString(),
+				data.SeqNum.To<string>(),
+				data.StrategyId,
+				data.Leverage.To<string>(),
+			}.Concat(data.BuildFrom.ToCsv());
 			writer.WriteRow(row);
 
 			metaInfo.LastTime = data.ServerTime.UtcDateTime;
 		}
 
-		/// <summary>
-		/// Read data from the specified reader.
-		/// </summary>
-		/// <param name="reader">CSV reader.</param>
-		/// <param name="metaInfo">Meta-information on data for one day.</param>
-		/// <returns>Data.</returns>
+		/// <inheritdoc />
 		protected override ExecutionMessage Read(FastCsvReader reader, IMarketDataMetaInfo metaInfo)
 		{
 			var msg = new ExecutionMessage
@@ -155,7 +154,7 @@ namespace StockSharp.Algo.Storages.Csv
 			reader.ReadString();
 
 			msg.IsUpTick = reader.ReadNullableBool();
-			msg.IsCancelled = reader.ReadBool();
+			/*msg.IsCancellation = */reader.Skip();
 			msg.OpenInterest = reader.ReadNullableDecimal();
 			msg.PnL = reader.ReadNullableDecimal();
 			msg.Position = reader.ReadNullableDecimal();
@@ -183,6 +182,32 @@ namespace StockSharp.Algo.Storages.Csv
 
 			if ((reader.ColumnCurr + 1) < reader.ColumnCount)
 				msg.CommissionCurrency = reader.ReadString();
+
+			if ((reader.ColumnCurr + 1) < reader.ColumnCount)
+			{
+				msg.IsMargin = reader.ReadNullableBool();
+				msg.IsManual = reader.ReadNullableBool();
+			}
+
+			if ((reader.ColumnCurr + 1) < reader.ColumnCount)
+			{
+				msg.MinVolume = reader.ReadNullableDecimal();
+				msg.PositionEffect = reader.ReadNullableEnum<OrderPositionEffects>();
+				msg.PostOnly = reader.ReadNullableBool();
+				msg.Initiator = reader.ReadNullableBool();
+			}
+
+			if ((reader.ColumnCurr + 1) < reader.ColumnCount)
+			{
+				msg.SeqNum = reader.ReadLong();
+				msg.StrategyId = reader.ReadString();
+			}
+
+			if ((reader.ColumnCurr + 1) < reader.ColumnCount)
+				msg.BuildFrom = reader.ReadBuildFrom();
+
+			if ((reader.ColumnCurr + 1) < reader.ColumnCount)
+				msg.Leverage = reader.ReadNullableInt();
 
 			return msg;
 		}

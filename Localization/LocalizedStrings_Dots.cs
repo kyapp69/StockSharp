@@ -603,5 +603,35 @@ namespace StockSharp.Localization
 		/// 
 		/// </summary>
 		public static string OrderSideDot => AppendDot(OrderSide);
+
+		/// <summary>
+		/// 
+		/// </summary>
+		public static string Str3506Dot => AppendDot(Str3506);
+
+		/// <summary>
+		/// 
+		/// </summary>
+		public static string DateTimeFormatDot => AppendDot(DateTimeFormat);
+
+		/// <summary>
+		/// 
+		/// </summary>
+		public static string TimeFormatDot => AppendDot(TimeFormat);
+
+		/// <summary>
+		/// 
+		/// </summary>
+		public static string Str437Dot => AppendDot(Str437);
+
+		/// <summary>
+		/// 
+		/// </summary>
+		public static string TransactionIdDot => AppendDot(TransactionId);
+
+		/// <summary>
+		/// 
+		/// </summary>
+		public static string Str254Dot => AppendDot(Str254);
 	}
 }

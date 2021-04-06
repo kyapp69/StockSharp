@@ -11,7 +11,7 @@
     	When exporting to text format (Txt) files, a window appears:
     	</para>
     	<mediaLink>
-    		<image placement="center" xlink:href="hyda_export_TSLab_MetaStock" />
+    		<image placement="center" xlink:href="hydra_export_TSLab_MetaStock_2" />
     	</mediaLink>
     	    	<para>
     	In which you need to specify the export template, where the curly brackets indicate the properties that need to be exported, and their order:

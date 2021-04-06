@@ -1,27 +1,12 @@
-#region S# License
-/******************************************************************************************
-NOTICE!!!  This program and source code is owned and licensed by
-StockSharp, LLC, www.stocksharp.com
-Viewing or use of this code requires your acceptance of the license
-agreement found at https://github.com/StockSharp/StockSharp/blob/master/LICENSE
-Removal of this comment is a violation of the license agreement.
-
-Project: StockSharp.Algo.Risk.Algo
-File: RiskRule.cs
-Created: 2015, 11, 11, 2:32 PM
-
-Copyright 2010 by StockSharp, LLC
-*******************************************************************************************/
-#endregion S# License
 namespace StockSharp.Algo.Risk
 {
 	using System;
 	using System.Collections.Generic;
 	using System.ComponentModel;
+	using System.Runtime.CompilerServices;
 
 	using Ecng.Common;
 	using Ecng.Serialization;
-	using Ecng.Collections;
 
 	using StockSharp.Messages;
 	using StockSharp.Localization;
@@ -51,15 +36,13 @@ namespace StockSharp.Algo.Risk
 			protected set
 			{
 				_title = value;
-				NotifyChanged(nameof(Title));
+				NotifyChanged();
 			}
 		}
 
 		private RiskActions _action;
 
-		/// <summary>
-		/// Action that needs to be taken in case of rule activation.
-		/// </summary>
+		/// <inheritdoc />
 		[DisplayNameLoc(LocalizedStrings.Str722Key)]
 		[DescriptionLoc(LocalizedStrings.Str859Key)]
 		[CategoryLoc(LocalizedStrings.GeneralKey)]
@@ -69,28 +52,19 @@ namespace StockSharp.Algo.Risk
 			set
 			{
 				_action = value;
-				NotifyChanged(nameof(Action));
+				NotifyChanged();
 			}
 		}
 
-		/// <summary>
-		/// To reset the state.
-		/// </summary>
+		/// <inheritdoc />
 		public virtual void Reset()
 		{
 		}
 
-		/// <summary>
-		/// To process the trade message.
-		/// </summary>
-		/// <param name="message">The trade message.</param>
-		/// <returns><see langword="true" />, if the rule is activated, otherwise, <see langword="false" />.</returns>
+		/// <inheritdoc />
 		public abstract bool ProcessMessage(Message message);
 
-		/// <summary>
-		/// Load settings.
-		/// </summary>
-		/// <param name="storage">Storage.</param>
+		/// <inheritdoc />
 		public override void Load(SettingsStorage storage)
 		{
 			Action = storage.GetValue<RiskActions>(nameof(Action));
@@ -98,10 +72,7 @@ namespace StockSharp.Algo.Risk
 			base.Load(storage);
 		}
 
-		/// <summary>
-		/// Save settings.
-		/// </summary>
-		/// <param name="storage">Storage.</param>
+		/// <inheritdoc />
 		public override void Save(SettingsStorage storage)
 		{
 			storage.SetValue(nameof(Action), Action.To<string>());
@@ -117,7 +88,7 @@ namespace StockSharp.Algo.Risk
 			remove => _propertyChanged -= value;
 		}
 
-		private void NotifyChanged(string propertyName)
+		private void NotifyChanged([CallerMemberName]string propertyName = null)
 		{
 			_propertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 		}
@@ -130,7 +101,16 @@ namespace StockSharp.Algo.Risk
 	[DescriptionLoc(LocalizedStrings.Str860Key)]
 	public class RiskPnLRule : RiskRule
 	{
-		private decimal _pnL;
+		private decimal? _initValue;
+
+		/// <inheritdoc />
+		public override void Reset()
+		{
+			base.Reset();
+			_initValue = null;
+		}
+
+		private Unit _pnL = new Unit();
 
 		/// <summary>
 		/// Profit-loss.
@@ -138,42 +118,53 @@ namespace StockSharp.Algo.Risk
 		[DisplayNameLoc(LocalizedStrings.PnLKey)]
 		[DescriptionLoc(LocalizedStrings.Str861Key)]
 		[CategoryLoc(LocalizedStrings.GeneralKey)]
-		public decimal PnL
+		public Unit PnL
 		{
 			get => _pnL;
 			set
 			{
-				_pnL = value;
+				_pnL = value ?? throw new ArgumentNullException(nameof(value));
 				Title = value.To<string>();
 			}
 		}
 
-		/// <summary>
-		/// To process the trade message.
-		/// </summary>
-		/// <param name="message">The trade message.</param>
-		/// <returns><see langword="true" />, if the rule is activated, otherwise, <see langword="false" />.</returns>
+		/// <inheritdoc />
 		public override bool ProcessMessage(Message message)
 		{
-			if (message.Type != MessageTypes.PortfolioChange)
+			if (message.Type != MessageTypes.PositionChange)
 				return false;
 
-			var pfMsg = (PortfolioChangeMessage)message;
-			var currValue = (decimal?)pfMsg.Changes.TryGetValue(PositionChangeTypes.CurrentValue);
+			var pfMsg = (PositionChangeMessage)message;
+
+			if (!pfMsg.IsMoney())
+				return false;
+
+			var currValue = pfMsg.TryGetDecimal(PositionChangeTypes.CurrentValue);
 
 			if (currValue == null)
 				return false;
 
-			if (PnL > 0)
-				return currValue >= PnL;
+			if (_initValue == null)
+			{
+				_initValue = currValue.Value;
+				return false;
+			}
+
+			if (PnL.Type == UnitTypes.Limit)
+			{
+				if (PnL.Value > 0)
+					return PnL.Value <= currValue.Value;
+				else
+					return PnL.Value >= currValue.Value;
+			}
+
+			if (PnL.Value > 0)
+				return (_initValue + PnL) <= currValue.Value;
 			else
-				return currValue <= PnL;
+				return (_initValue + PnL) >= currValue.Value;
 		}
 
-		/// <summary>
-		/// Save settings.
-		/// </summary>
-		/// <param name="storage">Storage.</param>
+		/// <inheritdoc />
 		public override void Save(SettingsStorage storage)
 		{
 			base.Save(storage);
@@ -181,15 +172,12 @@ namespace StockSharp.Algo.Risk
 			storage.SetValue(nameof(PnL), PnL);
 		}
 
-		/// <summary>
-		/// Load settings.
-		/// </summary>
-		/// <param name="storage">Storage.</param>
+		/// <inheritdoc />
 		public override void Load(SettingsStorage storage)
 		{
 			base.Load(storage);
 
-			PnL = storage.GetValue<decimal>(nameof(PnL));
+			PnL = storage.GetValue<Unit>(nameof(PnL));
 		}
 	}
 
@@ -218,18 +206,14 @@ namespace StockSharp.Algo.Risk
 			}
 		}
 
-		/// <summary>
-		/// To process the trade message.
-		/// </summary>
-		/// <param name="message">The trade message.</param>
-		/// <returns><see langword="true" />, if the rule is activated, otherwise, <see langword="false" />.</returns>
+		/// <inheritdoc />
 		public override bool ProcessMessage(Message message)
 		{
 			if (message.Type != MessageTypes.PositionChange)
 				return false;
 
 			var posMsg = (PositionChangeMessage)message;
-			var currValue = (decimal?)posMsg.Changes.TryGetValue(PositionChangeTypes.CurrentValue);
+			var currValue = posMsg.TryGetDecimal(PositionChangeTypes.CurrentValue);
 
 			if (currValue == null)
 				return false;
@@ -240,10 +224,7 @@ namespace StockSharp.Algo.Risk
 				return currValue <= Position;
 		}
 
-		/// <summary>
-		/// Save settings.
-		/// </summary>
-		/// <param name="storage">Storage.</param>
+		/// <inheritdoc />
 		public override void Save(SettingsStorage storage)
 		{
 			base.Save(storage);
@@ -251,10 +232,7 @@ namespace StockSharp.Algo.Risk
 			storage.SetValue(nameof(Position), Position);
 		}
 
-		/// <summary>
-		/// Load settings.
-		/// </summary>
-		/// <param name="storage">Storage.</param>
+		/// <inheritdoc />
 		public override void Load(SettingsStorage storage)
 		{
 			base.Load(storage);
@@ -292,20 +270,14 @@ namespace StockSharp.Algo.Risk
 			}
 		}
 
-		/// <summary>
-		/// To reset the state.
-		/// </summary>
+		/// <inheritdoc />
 		public override void Reset()
 		{
 			base.Reset();
 			_posOpenTime.Clear();
 		}
 
-		/// <summary>
-		/// To process the trade message.
-		/// </summary>
-		/// <param name="message">The trade message.</param>
-		/// <returns><see langword="true" />, if the rule is activated, otherwise, <see langword="false" />.</returns>
+		/// <inheritdoc />
 		public override bool ProcessMessage(Message message)
 		{
 			switch (message.Type)
@@ -313,7 +285,7 @@ namespace StockSharp.Algo.Risk
 				case MessageTypes.PositionChange:
 				{
 					var posMsg = (PositionChangeMessage)message;
-					var currValue = (decimal?)posMsg.Changes.TryGetValue(PositionChangeTypes.CurrentValue);
+					var currValue = posMsg.TryGetDecimal(PositionChangeTypes.CurrentValue);
 
 					if (currValue == null)
 						return false;
@@ -326,9 +298,7 @@ namespace StockSharp.Algo.Risk
 						return false;
 					}
 
-					var openTime = _posOpenTime.TryGetValue2(key);
-
-					if (openTime == null)
+					if (!_posOpenTime.TryGetValue(key, out var openTime))
 					{
 						_posOpenTime.Add(key, posMsg.LocalTime);
 						return false;
@@ -369,10 +339,7 @@ namespace StockSharp.Algo.Risk
 			return false;
 		}
 
-		/// <summary>
-		/// Save settings.
-		/// </summary>
-		/// <param name="storage">Storage.</param>
+		/// <inheritdoc />
 		public override void Save(SettingsStorage storage)
 		{
 			base.Save(storage);
@@ -380,10 +347,7 @@ namespace StockSharp.Algo.Risk
 			storage.SetValue(nameof(Time), Time);
 		}
 
-		/// <summary>
-		/// Load settings.
-		/// </summary>
-		/// <param name="storage">Storage.</param>
+		/// <inheritdoc />
 		public override void Load(SettingsStorage storage)
 		{
 			base.Load(storage);
@@ -417,18 +381,18 @@ namespace StockSharp.Algo.Risk
 			}
 		}
 
-		/// <summary>
-		/// To process the trade message.
-		/// </summary>
-		/// <param name="message">The trade message.</param>
-		/// <returns><see langword="true" />, if the rule is activated, otherwise, <see langword="false" />.</returns>
+		/// <inheritdoc />
 		public override bool ProcessMessage(Message message)
 		{
-			if (message.Type != MessageTypes.PortfolioChange)
+			if (message.Type != MessageTypes.PositionChange)
 				return false;
 
-			var pfMsg = (PortfolioChangeMessage)message;
-			var currValue = (decimal?)pfMsg.Changes.TryGetValue(PositionChangeTypes.Commission);
+			var pfMsg = (PositionChangeMessage)message;
+
+			if (!pfMsg.IsMoney())
+				return false;
+
+			var currValue = pfMsg.TryGetDecimal(PositionChangeTypes.Commission);
 
 			if (currValue == null)
 				return false;
@@ -436,10 +400,7 @@ namespace StockSharp.Algo.Risk
 			return currValue >= Commission;
 		}
 
-		/// <summary>
-		/// Save settings.
-		/// </summary>
-		/// <param name="storage">Storage.</param>
+		/// <inheritdoc />
 		public override void Save(SettingsStorage storage)
 		{
 			base.Save(storage);
@@ -447,10 +408,7 @@ namespace StockSharp.Algo.Risk
 			storage.SetValue(nameof(Commission), Commission);
 		}
 
-		/// <summary>
-		/// Load settings.
-		/// </summary>
-		/// <param name="storage">Storage.</param>
+		/// <inheritdoc />
 		public override void Load(SettingsStorage storage)
 		{
 			base.Load(storage);
@@ -484,11 +442,7 @@ namespace StockSharp.Algo.Risk
 			}
 		}
 
-		/// <summary>
-		/// To process the trade message.
-		/// </summary>
-		/// <param name="message">The trade message.</param>
-		/// <returns><see langword="true" />, if the rule is activated, otherwise, <see langword="false" />.</returns>
+		/// <inheritdoc />
 		public override bool ProcessMessage(Message message)
 		{
 			if (message.Type != MessageTypes.Execution)
@@ -506,10 +460,7 @@ namespace StockSharp.Algo.Risk
 				return currValue < Slippage;
 		}
 
-		/// <summary>
-		/// Save settings.
-		/// </summary>
-		/// <param name="storage">Storage.</param>
+		/// <inheritdoc />
 		public override void Save(SettingsStorage storage)
 		{
 			base.Save(storage);
@@ -517,10 +468,7 @@ namespace StockSharp.Algo.Risk
 			storage.SetValue(nameof(Slippage), Slippage);
 		}
 
-		/// <summary>
-		/// Load settings.
-		/// </summary>
-		/// <param name="storage">Storage.</param>
+		/// <inheritdoc />
 		public override void Load(SettingsStorage storage)
 		{
 			base.Load(storage);
@@ -554,11 +502,7 @@ namespace StockSharp.Algo.Risk
 			}
 		}
 
-		/// <summary>
-		/// To process the trade message.
-		/// </summary>
-		/// <param name="message">The trade message.</param>
-		/// <returns><see langword="true" />, if the rule is activated, otherwise, <see langword="false" />.</returns>
+		/// <inheritdoc />
 		public override bool ProcessMessage(Message message)
 		{
 			switch (message.Type)
@@ -580,10 +524,7 @@ namespace StockSharp.Algo.Risk
 			}
 		}
 
-		/// <summary>
-		/// Save settings.
-		/// </summary>
-		/// <param name="storage">Storage.</param>
+		/// <inheritdoc />
 		public override void Save(SettingsStorage storage)
 		{
 			base.Save(storage);
@@ -591,10 +532,7 @@ namespace StockSharp.Algo.Risk
 			storage.SetValue(nameof(Price), Price);
 		}
 
-		/// <summary>
-		/// Load settings.
-		/// </summary>
-		/// <param name="storage">Storage.</param>
+		/// <inheritdoc />
 		public override void Load(SettingsStorage storage)
 		{
 			base.Load(storage);
@@ -631,11 +569,7 @@ namespace StockSharp.Algo.Risk
 			}
 		}
 
-		/// <summary>
-		/// To process the trade message.
-		/// </summary>
-		/// <param name="message">The trade message.</param>
-		/// <returns><see langword="true" />, if the rule is activated, otherwise, <see langword="false" />.</returns>
+		/// <inheritdoc />
 		public override bool ProcessMessage(Message message)
 		{
 			switch (message.Type)
@@ -657,10 +591,7 @@ namespace StockSharp.Algo.Risk
 			}
 		}
 
-		/// <summary>
-		/// Save settings.
-		/// </summary>
-		/// <param name="storage">Storage.</param>
+		/// <inheritdoc />
 		public override void Save(SettingsStorage storage)
 		{
 			base.Save(storage);
@@ -668,10 +599,7 @@ namespace StockSharp.Algo.Risk
 			storage.SetValue(nameof(Volume), Volume);
 		}
 
-		/// <summary>
-		/// Load settings.
-		/// </summary>
-		/// <param name="storage">Storage.</param>
+		/// <inheritdoc />
 		public override void Load(SettingsStorage storage)
 		{
 			base.Load(storage);
@@ -738,9 +666,7 @@ namespace StockSharp.Algo.Risk
 			}
 		}
 
-		/// <summary>
-		/// To reset the state.
-		/// </summary>
+		/// <inheritdoc />
 		public override void Reset()
 		{
 			base.Reset();
@@ -749,11 +675,7 @@ namespace StockSharp.Algo.Risk
 			_endTime = null;
 		}
 
-		/// <summary>
-		/// To process the trade message.
-		/// </summary>
-		/// <param name="message">The trade message.</param>
-		/// <returns><see langword="true" />, if the rule is activated, otherwise, <see langword="false" />.</returns>
+		/// <inheritdoc />
 		public override bool ProcessMessage(Message message)
 		{
 			switch (message.Type)
@@ -808,10 +730,7 @@ namespace StockSharp.Algo.Risk
 			return false;
 		}
 
-		/// <summary>
-		/// Save settings.
-		/// </summary>
-		/// <param name="storage">Storage.</param>
+		/// <inheritdoc />
 		public override void Save(SettingsStorage storage)
 		{
 			base.Save(storage);
@@ -820,10 +739,7 @@ namespace StockSharp.Algo.Risk
 			storage.SetValue(nameof(Interval), Interval);
 		}
 
-		/// <summary>
-		/// Load settings.
-		/// </summary>
-		/// <param name="storage">Storage.</param>
+		/// <inheritdoc />
 		public override void Load(SettingsStorage storage)
 		{
 			base.Load(storage);
@@ -858,11 +774,7 @@ namespace StockSharp.Algo.Risk
 			}
 		}
 
-		/// <summary>
-		/// To process the trade message.
-		/// </summary>
-		/// <param name="message">The trade message.</param>
-		/// <returns><see langword="true" />, if the rule is activated, otherwise, <see langword="false" />.</returns>
+		/// <inheritdoc />
 		public override bool ProcessMessage(Message message)
 		{
 			if (message.Type != MessageTypes.Execution)
@@ -876,10 +788,7 @@ namespace StockSharp.Algo.Risk
 			return execMsg.TradePrice >= Price;
 		}
 
-		/// <summary>
-		/// Save settings.
-		/// </summary>
-		/// <param name="storage">Storage.</param>
+		/// <inheritdoc />
 		public override void Save(SettingsStorage storage)
 		{
 			base.Save(storage);
@@ -887,10 +796,7 @@ namespace StockSharp.Algo.Risk
 			storage.SetValue(nameof(Price), Price);
 		}
 
-		/// <summary>
-		/// Load settings.
-		/// </summary>
-		/// <param name="storage">Storage.</param>
+		/// <inheritdoc />
 		public override void Load(SettingsStorage storage)
 		{
 			base.Load(storage);
@@ -927,11 +833,7 @@ namespace StockSharp.Algo.Risk
 			}
 		}
 
-		/// <summary>
-		/// To process the trade message.
-		/// </summary>
-		/// <param name="message">The trade message.</param>
-		/// <returns><see langword="true" />, if the rule is activated, otherwise, <see langword="false" />.</returns>
+		/// <inheritdoc />
 		public override bool ProcessMessage(Message message)
 		{
 			if (message.Type != MessageTypes.Execution)
@@ -945,10 +847,7 @@ namespace StockSharp.Algo.Risk
 			return execMsg.TradeVolume >= Volume;
 		}
 
-		/// <summary>
-		/// Save settings.
-		/// </summary>
-		/// <param name="storage">Storage.</param>
+		/// <inheritdoc />
 		public override void Save(SettingsStorage storage)
 		{
 			base.Save(storage);
@@ -956,10 +855,7 @@ namespace StockSharp.Algo.Risk
 			storage.SetValue(nameof(Volume), Volume);
 		}
 
-		/// <summary>
-		/// Load settings.
-		/// </summary>
-		/// <param name="storage">Storage.</param>
+		/// <inheritdoc />
 		public override void Load(SettingsStorage storage)
 		{
 			base.Load(storage);
@@ -1025,9 +921,7 @@ namespace StockSharp.Algo.Risk
 			}
 		}
 
-		/// <summary>
-		/// To reset the state.
-		/// </summary>
+		/// <inheritdoc />
 		public override void Reset()
 		{
 			base.Reset();
@@ -1036,11 +930,7 @@ namespace StockSharp.Algo.Risk
 			_endTime = null;
 		}
 
-		/// <summary>
-		/// To process the trade message.
-		/// </summary>
-		/// <param name="message">The trade message.</param>
-		/// <returns><see langword="true" />, if the rule is activated, otherwise, <see langword="false" />.</returns>
+		/// <inheritdoc />
 		public override bool ProcessMessage(Message message)
 		{
 			if (message.Type != MessageTypes.Execution)
@@ -1093,10 +983,7 @@ namespace StockSharp.Algo.Risk
 			return false;
 		}
 
-		/// <summary>
-		/// Save settings.
-		/// </summary>
-		/// <param name="storage">Storage.</param>
+		/// <inheritdoc />
 		public override void Save(SettingsStorage storage)
 		{
 			base.Save(storage);
@@ -1105,10 +992,7 @@ namespace StockSharp.Algo.Risk
 			storage.SetValue(nameof(Interval), Interval);
 		}
 
-		/// <summary>
-		/// Load settings.
-		/// </summary>
-		/// <param name="storage">Storage.</param>
+		/// <inheritdoc />
 		public override void Load(SettingsStorage storage)
 		{
 			base.Load(storage);

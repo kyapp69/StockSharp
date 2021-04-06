@@ -16,25 +16,52 @@ Copyright 2010 by StockSharp, LLC
 namespace StockSharp.Messages
 {
 	using System;
+	using System.ComponentModel.DataAnnotations;
 
 	using Ecng.Common;
 
+	using StockSharp.Localization;
+
 	/// <summary>
-	/// Message sender base interface.
+	/// States <see cref="IMessageChannel"/>.
 	/// </summary>
-	public interface IMessageSender
+	public enum ChannelStates
 	{
 		/// <summary>
-		/// Send message.
+		/// Stopped.
 		/// </summary>
-		/// <param name="message">Message.</param>
-		void SendInMessage(Message message);
+		[Display(ResourceType = typeof(LocalizedStrings), Name = LocalizedStrings.Str1128Key)]
+		Stopped,
 
 		/// <summary>
-		/// Send outgoing message.
+		/// Stopping.
 		/// </summary>
-		/// <param name="message">Message.</param>
-		void SendOutMessage(Message message);
+		[Display(ResourceType = typeof(LocalizedStrings), Name = LocalizedStrings.Str1114Key)]
+		Stopping,
+
+		/// <summary>
+		/// Starting.
+		/// </summary>
+		[Display(ResourceType = typeof(LocalizedStrings), Name = LocalizedStrings.Str1129Key)]
+		Starting,
+
+		/// <summary>
+		/// Working.
+		/// </summary>
+		[Display(ResourceType = typeof(LocalizedStrings), Name = LocalizedStrings.Str1130Key)]
+		Started,
+
+		/// <summary>
+		/// In the process of suspension.
+		/// </summary>
+		[Display(ResourceType = typeof(LocalizedStrings), Name = LocalizedStrings.Str1131Key)]
+		Suspending, 
+
+		/// <summary>
+		/// Suspended.
+		/// </summary>
+		[Display(ResourceType = typeof(LocalizedStrings), Name = LocalizedStrings.Str1132Key)]
+		Suspended,
 	}
 
 	/// <summary>
@@ -43,9 +70,14 @@ namespace StockSharp.Messages
 	public interface IMessageChannel : IDisposable, ICloneable<IMessageChannel>
 	{
 		/// <summary>
-		/// Is channel opened.
+		/// State.
 		/// </summary>
-		bool IsOpened { get; }
+		ChannelStates State { get; }
+
+		/// <summary>
+		/// <see cref="State"/> change event.
+		/// </summary>
+		event Action StateChanged;
 
 		/// <summary>
 		/// Open channel.
@@ -58,10 +90,26 @@ namespace StockSharp.Messages
 		void Close();
 
 		/// <summary>
+		/// Suspend.
+		/// </summary>
+		void Suspend();
+
+		/// <summary>
+		/// Resume.
+		/// </summary>
+		void Resume();
+
+		/// <summary>
+		/// Clear.
+		/// </summary>
+		void Clear();
+
+		/// <summary>
 		/// Send message.
 		/// </summary>
 		/// <param name="message">Message.</param>
-		void SendInMessage(Message message);
+		/// <returns><see langword="true"/> if the specified message was processed successfully, otherwise, <see langword="false"/>.</returns>
+		bool SendInMessage(Message message);
 
 		/// <summary>
 		/// New message event.
@@ -85,7 +133,13 @@ namespace StockSharp.Messages
 		{
 		}
 
-		bool IMessageChannel.IsOpened => true;
+		ChannelStates IMessageChannel.State => ChannelStates.Started;
+
+		event Action IMessageChannel.StateChanged
+		{
+			add { }
+			remove { }
+		}
 
 		void IMessageChannel.Open()
 		{
@@ -95,9 +149,22 @@ namespace StockSharp.Messages
 		{
 		}
 
-		void IMessageChannel.SendInMessage(Message message)
+		void IMessageChannel.Suspend()
+		{
+		}
+
+		void IMessageChannel.Resume()
+		{
+		}
+
+		void IMessageChannel.Clear()
+		{
+		}
+
+		bool IMessageChannel.SendInMessage(Message message)
 		{
 			_newMessage?.Invoke(message);
+			return true;
 		}
 
 		private Action<Message> _newMessage;

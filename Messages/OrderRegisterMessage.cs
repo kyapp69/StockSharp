@@ -67,15 +67,6 @@ namespace StockSharp.Messages
 		public Sides Side { get; set; }
 
 		/// <summary>
-		/// Placed order comment.
-		/// </summary>
-		[DataMember]
-		[DisplayNameLoc(LocalizedStrings.Str135Key)]
-		[DescriptionLoc(LocalizedStrings.Str136Key)]
-		[MainCategory]
-		public string Comment { get; set; }
-
-		/// <summary>
 		/// Order expiry time. The default is <see langword="null" />, which mean (GTC).
 		/// </summary>
 		/// <remarks>
@@ -97,22 +88,6 @@ namespace StockSharp.Messages
 		public TimeInForce? TimeInForce { get; set; }
 
 		/// <summary>
-		/// Information for REPO\REPO-M orders.
-		/// </summary>
-		[DisplayNameLoc(LocalizedStrings.Str233Key)]
-		[DescriptionLoc(LocalizedStrings.Str234Key)]
-		[MainCategory]
-		public RepoOrderInfo RepoInfo { get; set; }
-
-		/// <summary>
-		/// Information for Negotiate Deals Mode orders.
-		/// </summary>
-		[DisplayNameLoc(LocalizedStrings.Str235Key)]
-		[DescriptionLoc(LocalizedStrings.Str236Key)]
-		[MainCategory]
-		public RpsOrderInfo RpsInfo { get; set; }
-
-		/// <summary>
 		/// Is the order of market-maker.
 		/// </summary>
 		[DataMember]
@@ -122,21 +97,44 @@ namespace StockSharp.Messages
 		public bool? IsMarketMaker { get; set; }
 
 		/// <summary>
-		/// Is margin enabled.
-		/// </summary>
-		[DataMember]
-		[DisplayNameLoc(LocalizedStrings.MarginKey)]
-		[DescriptionLoc(LocalizedStrings.IsMarginKey)]
-		[MainCategory]
-		public bool? IsMargin { get; set; }
-
-		/// <summary>
 		/// Slippage in trade price.
 		/// </summary>
 		[DataMember]
 		[DisplayNameLoc(LocalizedStrings.Str163Key)]
 		[DescriptionLoc(LocalizedStrings.Str164Key)]
 		public decimal? Slippage { get; set; }
+
+		/// <summary>
+		/// Is order manual.
+		/// </summary>
+		[DataMember]
+		[DisplayNameLoc(LocalizedStrings.ManualKey)]
+		[DescriptionLoc(LocalizedStrings.IsOrderManualKey)]
+		public bool? IsManual { get; set; }
+
+		/// <summary>
+		/// Minimum quantity of an order to be executed.
+		/// </summary>
+		[DataMember]
+		public decimal? MinOrderVolume { get; set; }
+
+		/// <summary>
+		/// Position effect.
+		/// </summary>
+		[DataMember]
+		public OrderPositionEffects? PositionEffect { get; set; }
+
+		/// <summary>
+		/// Post-only order.
+		/// </summary>
+		[DataMember]
+		public bool? PostOnly { get; set; }
+
+		/// <summary>
+		/// Margin leverage.
+		/// </summary>
+		[DataMember]
+		public int? Leverage { get; set; }
 
 		/// <summary>
 		/// Initializes a new instance of the <see cref="OrderRegisterMessage"/>.
@@ -162,9 +160,7 @@ namespace StockSharp.Messages
 		public override Message Clone()
 		{
 			var clone = new OrderRegisterMessage(Type);
-
 			CopyTo(clone);
-
 			return clone;
 		}
 
@@ -174,42 +170,38 @@ namespace StockSharp.Messages
 		/// <param name="destination">The object, to which copied information.</param>
 		public void CopyTo(OrderRegisterMessage destination)
 		{
-			if (destination == null)
-				throw new ArgumentNullException(nameof(destination));
-
-			destination.Comment = Comment;
-			destination.Condition = Condition?.Clone();
-			destination.TillDate = TillDate;
-			destination.OrderType = OrderType;
-			destination.PortfolioName = PortfolioName;
-			destination.Price = Price;
-			destination.RepoInfo = RepoInfo?.Clone();
-			destination.RpsInfo = RpsInfo?.Clone();
-			//destination.SecurityId = SecurityId;
-			//destination.SecurityType = SecurityType;
-			destination.Side = Side;
-			destination.TimeInForce = TimeInForce;
-			destination.TransactionId = TransactionId;
-			destination.VisibleVolume = VisibleVolume;
-			destination.Volume = Volume;
-			//destination.Currency = Currency;
-			destination.UserOrderId = UserOrderId;
-			destination.ClientCode = ClientCode;
-			destination.BrokerCode = BrokerCode;
-			destination.IsMarketMaker = IsMarketMaker;
-			destination.IsMargin = IsMargin;
-			destination.Slippage = Slippage;
-
 			base.CopyTo(destination);
+
+			destination.Price = Price;
+			destination.Volume = Volume;
+			destination.VisibleVolume = VisibleVolume;
+			destination.Side = Side;
+			destination.TillDate = TillDate;
+			destination.TimeInForce = TimeInForce;
+			destination.IsMarketMaker = IsMarketMaker;
+			destination.Slippage = Slippage;
+			destination.IsManual = IsManual;
+			destination.MinOrderVolume = MinOrderVolume;
+			destination.PositionEffect = PositionEffect;
+			destination.PostOnly = PostOnly;
+			destination.Leverage = Leverage;
 		}
 
-		/// <summary>
-		/// Returns a string that represents the current object.
-		/// </summary>
-		/// <returns>A string that represents the current object.</returns>
+		/// <inheritdoc />
 		public override string ToString()
 		{
-			return base.ToString() + $",TransId={TransactionId},Price={Price},Side={Side},OrdType={OrderType},Vol={Volume},Sec={SecurityId},Pf={PortfolioName}";
+			var str = base.ToString() + $",Price={Price},Side={Side},Vol={Volume}/{VisibleVolume}/{MinOrderVolume},Till={TillDate},TIF={TimeInForce},MM={IsMarketMaker},SLP={Slippage},MN={IsManual}";
+
+			if (PositionEffect != null)
+				str += $",PosEffect={PositionEffect.Value}";
+
+			if (PostOnly != null)
+				str += $",PostOnly={PostOnly.Value}";
+
+			if (Leverage != null)
+				str += $",Leverage={Leverage.Value}";
+
+			return str;
 		}
 	}
 }

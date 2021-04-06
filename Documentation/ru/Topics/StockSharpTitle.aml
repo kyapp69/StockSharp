@@ -12,77 +12,12 @@
 форекс и т.д.). Вы сможете торговать в ручном режиме или с помощью торговых 
 роботов (обычные или HFT).
  </para>
- <para>
-Доступные подключения: 
 
- </para>
-<list class="bullet">
-	<listItem>
-		<token>lmax_external</token>,
-		<token>oanda_external</token>,
-		<token>fxcm_external</token>
-	</listItem>
-	<listItem>
-		<token>Binance</token>,
-		<token>Bitexbook</token>,
-		<token>Bitfinex</token>,
-		<token>Bithumb</token>,
-		<token>Bitmex</token>,
-		<token>BitStamp</token>,
-		<token>Bittrex</token>,
-		<token>Btce</token>,
-		<token>Cex</token>,
-		<token>Coinbase</token>,
-		<token>Coincheck</token>,
-		<token>CoinExchange</token>,
-		<token>Cryptopia</token>,
-		<token>Deribit</token>,
-		<token>Exmo</token>,
-		<token>Gdax</token>,
-		<token>HitBtc</token>,
-		<token>Huobi</token>,
-		<token>Kraken</token>,
-		<token>Kucoin</token>,
-		<token>Liqui</token>,
-		<token>LiveCoin</token>,
-		<token>Okcoin</token>,
-		<token>Okex</token>,
-		<token>Poloniex</token>,
-		<token>Yobit</token>
-	</listItem>
-	<listItem>
-	<token>quik</token>, <token>quikfix</token>, <token>smartcom</token>, <token>alfa</token>, 
-		<token>plaza</token>, <token>transaq</token>, <token>micexbridge</token>, <token>alor</token>,
-		<token>spbex</token>
-	</listItem>
-	<listItem>
-		<token>OpenECry</token>,
-		<token>IB</token>,
-		<token>blackwood</token>,
-		<token>etrade</token>,
-		<token>iqfeed</token>,
-		<token>sterling</token>,
-		<token>cqg</token>,
-		<token>rithmic</token>,
-		<token>itch</token>,
-		<token>quantfeed</token>
-	</listItem>
-	<listItem>
-		<link xlink:href="29dfad18-ac49-4cf4-993c-c32d62101fff">FIX</link>,
-		<link xlink:href="c4dcbcb3-3b3f-4772-acd4-8068e8cadd93">FIX Server</link>
-	</listItem>
-</list>
+<para><legacyBold>Доступно боле 70 подключений</legacyBold> различных бирж мира 
+<link xlink:href="db1de349-84ef-4e59-a30b-c34a9d47bed2" />.</para>
 
  <para>
- Вы можете работать с <token>stocksharp</token> у любого брокера или 
-<externalLink>
-<linkText>брокер-партнер</linkText>
-<linkUri>https://stocksharp.ru/broker/</linkUri>
-</externalLink>
-<externalLink>
-<linkText>(преимущества).</linkText>
-<linkUri>https://stocksharp.ru/products/pricing/</linkUri>
-</externalLink>
+ Вы можете работать с <token>stocksharp</token> у любого брокера, который поддерживает наши подключения.
  </para>
  <title>S#.Designer</title>
  <mediaLink>
@@ -120,10 +55,9 @@
 <steps class="ordered">
 <step>
 <content>
-<legacyBold>Множество типов подключений</legacyBold>: Quik, Transaq, SmartCOM, AlfaDirect, Plaza 2 (CGate), 
-TWIME, FIX/FAST, Micex Bridge, Oanda, FXCM, LMAX, Rithmic, Fusion/Blackwood, Interactive Brokers, 
-OpenECry, Sterling, BarChart, IQFeed, E*Trade, BTCE, BitStamp, BitStamp, Bitfinex, 
-Coinbase, Kraken, Poloniex, GDAX, Bittrex, Bithumb, HitBTC, OKCoin, Coincheck, ITCH.</content>
+<para><legacyBold>Поддержка боле 70 подключений</legacyBold> различных бирж мира 
+<link xlink:href="db1de349-84ef-4e59-a30b-c34a9d47bed2" />.</para>
+</content>
 </step>
 <step>
 <content>
@@ -188,10 +122,10 @@ Coinbase, Kraken, Poloniex, GDAX, Bittrex, Bithumb, HitBTC, OKCoin, Coincheck, I
 <link xlink:href="a720a275-440a-44ce-86e2-bcec2e0bc55f" /> - программа для автоматического скачивания исторических и реал-тайм маркет-данных:
 </para>
 <list class="bullet">
-  <listItem><para><legacyBold>Множество типов подключений</legacyBold>: Quik, Transaq, SmartCOM, AlfaDirect, Plaza 2 (CGate), 
-TWIME, FIX/FAST, Micex Bridge, Oanda, FXCM, LMAX, Rithmic, Fusion/Blackwood, Interactive Brokers, 
-OpenECry, Sterling, BarChart, IQFeed, E*Trade, BTCE, BitStamp, BitStamp, Bitfinex, 
-Coinbase, Kraken, Poloniex, GDAX, Bittrex, Bithumb, HitBTC, OKCoin, Coincheck, ITCH.</para></listItem>
+  <listItem>
+<para><legacyBold>Поддержка боле 70 подключений</legacyBold> различных бирж мира 
+<link xlink:href="db1de349-84ef-4e59-a30b-c34a9d47bed2" />.</para>
+</listItem>
   <listItem><para><legacyBold>Высокая степенью сжатия</legacyBold> (2 байта на сделку, 7 байтов на стакан).</para></listItem>
   <listItem><para><legacyBold>Любые типа данных</legacyBold> (свечи, тики, стаканы, ордер-лог, опционы, новости и другое).</para></listItem>
   <listItem><para><legacyBold>Программный доступ через API.</legacyBold></para></listItem>
@@ -216,11 +150,8 @@ Coinbase, Kraken, Poloniex, GDAX, Bittrex, Bithumb, HitBTC, OKCoin, Coincheck, I
   <listItem><para><link xlink:href="76470d21-d624-46d1-a8c6-b52f7fabdeb4" /> - универсальная программа для создания торговых роботов и стратегий.</para></listItem>
   <listItem><para><link xlink:href="a720a275-440a-44ce-86e2-bcec2e0bc55f" /> - программа для скачивания маркет-данных.</para></listItem>
   <listItem><para><link xlink:href="e0f9d08e-5dba-4d5d-9248-4d37eba61b22" /> - библиотека для написания торговых роботов на языке <token>csharp</token> в Visual Studio.</para></listItem>
-  <listItem><para> <externalLink>
-<linkText>S#.Terminal</linkText>
-<linkUri>https://stocksharp.ru/products/terminal/</linkUri>
-</externalLink>
- - торговый терминал.</para></listItem>
+  <listItem><para><link xlink:href="e4b5e112-bd08-4f40-8741-7514e7e4088e" /> - торговый терминал.</para></listItem>
+  <listItem><para><link xlink:href="c84e2ec8-88b4-4055-ad76-14c22c7844a6" /> - готовый графический каркас c исходными кодами.</para></listItem>
   <listItem><para><link xlink:href="e3f889a5-ddcd-4c77-a174-2f24385386a0" /> - интеграция MatLab с торговыми системами. Торговля из скриптов MatLab.</para></listItem>
   <listItem><para><externalLink>
 <linkText>ЛЧИ Viewer</linkText>
@@ -228,16 +159,6 @@ Coinbase, Kraken, Poloniex, GDAX, Bittrex, Bithumb, HitBTC, OKCoin, Coincheck, I
 </externalLink>
  - графики конкурса ЛЧИ со сделками участников.</para></listItem>
 </list>
- <!--<para>
- Презентации наших продуктов в виде <externalLink>
-<linkText> pdft</linkText>
-<linkUri>https://stocksharp.ru/file/102474/stocksharp_pdf/</linkUri>
-</externalLink>
- и <externalLink>
-<linkText>PowerPoint</linkText>
-<linkUri>https://stocksharp.ru/file/102474/stocksharp_pdf/</linkUri>
-</externalLink>
- </para>-->
  <para> 
 <legacyUnderline><legacyItalic><legacyBold><token>download</token></legacyBold></legacyItalic></legacyUnderline>
 </para>

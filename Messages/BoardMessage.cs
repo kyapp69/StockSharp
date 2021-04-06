@@ -17,15 +17,18 @@ namespace StockSharp.Messages
 {
 	using System;
 	using System.Runtime.Serialization;
+	using System.Xml.Serialization;
+
+	using Ecng.Serialization;
 
 	using StockSharp.Localization;
 
 	/// <summary>
 	/// The message contains information about the electronic board.
 	/// </summary>
-	[DataContract]
+	[System.Runtime.Serialization.DataContract]
 	[Serializable]
-	public class BoardMessage : Message
+	public class BoardMessage : BaseSubscriptionIdMessage<BoardMessage>
 	{
 		/// <summary>
 		/// Exchange code, which owns the board. Maybe be the same <see cref="Code"/>.
@@ -44,12 +47,6 @@ namespace StockSharp.Messages
 		[DescriptionLoc(LocalizedStrings.BoardCodeKey, true)]
 		[MainCategory]
 		public string Code { get; set; }
-
-		/// <summary>
-		/// ID of the original message <see cref="BoardLookupMessage.TransactionId"/> for which this message is a response.
-		/// </summary>
-		[DataMember]
-		public long OriginalTransactionId { get; set; }
 
 		///// <summary>
 		///// Gets a value indicating whether the re-registration orders via <see cref="OrderReplaceMessage"/> as a single transaction.
@@ -78,7 +75,7 @@ namespace StockSharp.Messages
 		[MainCategory]
 		public TimeSpan ExpiryTime { get; set; }
 
-		private WorkingTime _workingTime = new WorkingTime();
+		private WorkingTime _workingTime = new WorkingTime { IsEnabled = true };
 
 		/// <summary>
 		/// Board working hours.
@@ -112,6 +109,8 @@ namespace StockSharp.Messages
 		[DisplayNameLoc(LocalizedStrings.TimeZoneKey)]
 		[DescriptionLoc(LocalizedStrings.Str68Key)]
 		[MainCategory]
+		[XmlIgnore]
+		[Ecng.Serialization.TimeZoneInfo]
 		public TimeZoneInfo TimeZone
 		{
 			get => _timeZone;
@@ -127,6 +126,9 @@ namespace StockSharp.Messages
 			}
 		}
 
+		/// <inheritdoc />
+		public override DataType DataType => DataType.Board;
+
 		/// <summary>
 		/// Initializes a new instance of the <see cref="BoardMessage"/>.
 		/// </summary>
@@ -135,23 +137,18 @@ namespace StockSharp.Messages
 		{
 		}
 
-		/// <summary>
-		/// Create a copy of <see cref="BoardMessage"/>.
-		/// </summary>
-		/// <returns>Copy.</returns>
-		public override Message Clone()
+		/// <inheritdoc />
+		public override void CopyTo(BoardMessage destination)
 		{
-			return new BoardMessage
-			{
-				Code = Code,
-				ExchangeCode = ExchangeCode,
-				ExpiryTime = ExpiryTime,
-				//IsSupportAtomicReRegister = IsSupportAtomicReRegister,
-				//IsSupportMarketOrders = IsSupportMarketOrders,
-				WorkingTime = WorkingTime.Clone(),
-				TimeZone = TimeZone,
-				OriginalTransactionId = OriginalTransactionId,
-			};
+			base.CopyTo(destination);
+
+			destination.Code = Code;
+			destination.ExchangeCode = ExchangeCode;
+			destination.ExpiryTime = ExpiryTime;
+			//destination.IsSupportAtomicReRegister = IsSupportAtomicReRegister;
+			//destination.IsSupportMarketOrders = IsSupportMarketOrders;
+			destination.WorkingTime = WorkingTime.Clone();
+			destination.TimeZone = TimeZone;
 		}
 
 		/// <inheritdoc />

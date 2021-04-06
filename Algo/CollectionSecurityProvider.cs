@@ -7,17 +7,19 @@ namespace StockSharp.Algo
 	using Ecng.Collections;
 
 	using StockSharp.BusinessEntities;
+	using StockSharp.Messages;
 
 	/// <summary>
 	/// The supplier of information on instruments, getting data from the collection.
 	/// </summary>
-	public class CollectionSecurityProvider : SynchronizedList<Security>, ISecurityProvider
+	public class CollectionSecurityProvider : ISecurityProvider
 	{
+		private readonly SynchronizedDictionary<SecurityId, Security> _inner = new SynchronizedDictionary<SecurityId, Security>();
+
 		/// <summary>
 		/// Initializes a new instance of the <see cref="CollectionSecurityProvider"/>.
 		/// </summary>
 		public CollectionSecurityProvider()
-			: this(Enumerable.Empty<Security>())
 		{
 		}
 
@@ -26,22 +28,10 @@ namespace StockSharp.Algo
 		/// </summary>
 		/// <param name="securities">The instruments collection.</param>
 		public CollectionSecurityProvider(IEnumerable<Security> securities)
-		{
-			if (securities == null)
-				throw new ArgumentNullException(nameof(securities));
+			=> AddRange(securities);
 
-			AddRange(securities);
-
-			AddedRange += s => _added?.Invoke(s);
-			RemovedRange += s => _removed?.Invoke(s);
-
-			if (securities is INotifyList<Security> notifyList)
-			{
-				notifyList.Added += Add;
-				notifyList.Removed += s => Remove(s);
-				notifyList.Cleared += Clear;
-			}
-		}
+		/// <inheritdoc />
+		public int Count => _inner.Count;
 
 		private Action<IEnumerable<Security>> _added;
 
@@ -59,20 +49,91 @@ namespace StockSharp.Algo
 			remove => _removed -= value;
 		}
 
-		void IDisposable.Dispose()
+		private Action _cleared;
+
+		event Action ISecurityProvider.Cleared
 		{
+			add => _cleared += value;
+			remove => _cleared -= value;
+		}
+
+		/// <inheritdoc />
+		public Security LookupById(SecurityId id) => _inner.TryGetValue(id);
+
+		/// <inheritdoc />
+		public IEnumerable<Security> Lookup(SecurityLookupMessage criteria) => _inner.SyncGet(d => d.Values.Filter(criteria));
+
+		/// <summary>
+		/// Add security.
+		/// </summary>
+		/// <param name="security">Security.</param>
+		public void Add(Security security)
+		{
+			if (_inner.TryAdd2(security.ToSecurityId(), security))
+				_added?.Invoke(new[] { security });
 		}
 
 		/// <summary>
-		/// Lookup securities by criteria <paramref name="criteria" />.
+		/// Remove security.
 		/// </summary>
-		/// <param name="criteria">The instrument whose fields will be used as a filter.</param>
-		/// <returns>Found instruments.</returns>
-		public IEnumerable<Security> Lookup(Security criteria)
+		/// <param name="security">Security.</param>
+		/// <returns>Check result.</returns>
+		public bool Remove(Security security)
 		{
-			//var provider = Securities as ISecurityProvider;
-			//return provider == null ? Securities.Filter(criteria) : provider.Lookup(criteria);
-			return this.Filter(criteria);
+			if (security is null)
+				throw new ArgumentNullException(nameof(security));
+
+			RemoveRange(new[] { security });
+			return true;
+		}
+
+		/// <summary>
+		/// Add securities.
+		/// </summary>
+		/// <param name="securities">Securities.</param>
+		public void AddRange(IEnumerable<Security> securities)
+		{
+			if (securities is null)
+				throw new ArgumentNullException(nameof(securities));
+
+			var added = new HashSet<Security>(securities);
+
+			foreach (var security in securities)
+			{
+				if (!_inner.TryAdd2(security.ToSecurityId(), security))
+					added.Remove(security);
+			}
+
+			_added?.Invoke(added);
+		}
+
+		/// <summary>
+		/// Remove securities.
+		/// </summary>
+		/// <param name="securities">Securities.</param>
+		public void RemoveRange(IEnumerable<Security> securities)
+		{
+			if (securities is null)
+				throw new ArgumentNullException(nameof(securities));
+
+			var removed = new HashSet<Security>(securities);
+
+			foreach (var security in securities)
+			{
+				if (!_inner.Remove(security.ToSecurityId()))
+					removed.Remove(security);
+			}
+
+			_removed?.Invoke(removed);
+		}
+
+		/// <summary>
+		/// Clear.
+		/// </summary>
+		public void Clear()
+		{
+			_inner.Clear();
+			_cleared?.Invoke();
 		}
 	}
 }

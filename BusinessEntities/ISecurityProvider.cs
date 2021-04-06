@@ -18,10 +18,12 @@ namespace StockSharp.BusinessEntities
 	using System;
 	using System.Collections.Generic;
 
+	using StockSharp.Messages;
+
 	/// <summary>
 	/// The interface for access to provider of information about instruments.
 	/// </summary>
-	public interface ISecurityProvider : IDisposable
+	public interface ISecurityProvider
 	{
 		/// <summary>
 		/// Gets the number of instruments contained in the <see cref="ISecurityProvider"/>.
@@ -44,10 +46,17 @@ namespace StockSharp.BusinessEntities
 		event Action Cleared;
 
 		/// <summary>
+		/// To get the instrument by the identifier.
+		/// </summary>
+		/// <param name="id">Security ID.</param>
+		/// <returns>The got instrument. If there is no instrument by given criteria, <see langword="null" /> is returned.</returns>
+		Security LookupById(SecurityId id);
+
+		/// <summary>
 		/// Lookup securities by criteria <paramref name="criteria" />.
 		/// </summary>
-		/// <param name="criteria">The instrument whose fields will be used as a filter.</param>
+		/// <param name="criteria">Message security lookup for specified criteria.</param>
 		/// <returns>Found instruments.</returns>
-		IEnumerable<Security> Lookup(Security criteria);
+		IEnumerable<Security> Lookup(SecurityLookupMessage criteria);
 	}
 }

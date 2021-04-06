@@ -20,6 +20,8 @@ namespace StockSharp.Messages
 	using System.ComponentModel.DataAnnotations;
 	using System.Runtime.Serialization;
 
+	using Ecng.Common;
+
 	using StockSharp.Localization;
 
 	/// <summary>
@@ -105,6 +107,20 @@ namespace StockSharp.Messages
 		[EnumMember]
 		[Display(ResourceType = typeof(LocalizedStrings), Name = LocalizedStrings.RenkoCandleKey)]
 		CandleRenko,
+
+		/// <summary>
+		/// Board info.
+		/// </summary>
+		[EnumMember]
+		[Display(ResourceType = typeof(LocalizedStrings), Name = LocalizedStrings.BoardInfoKey)]
+		Board,
+
+		/// <summary>
+		/// Heikin Ashi.
+		/// </summary>
+		[EnumMember]
+		[Display(ResourceType = typeof(LocalizedStrings), Name = LocalizedStrings.HeikinAshiKey)]
+		CandleHeikinAshi
 	}
 
 	/// <summary>
@@ -141,32 +157,51 @@ namespace StockSharp.Messages
 	/// </summary>
 	[DataContract]
 	[Serializable]
-	public class MarketDataMessage : SecurityMessage
+	public class MarketDataMessage : SecurityMessage, ISubscriptionMessage, IGeneratedMessage
 	{
-		/// <summary>
-		/// Start date, from which data needs to be retrieved.
-		/// </summary>
+		/// <inheritdoc />
 		[DataMember]
 		[DisplayNameLoc(LocalizedStrings.Str343Key)]
 		[DescriptionLoc(LocalizedStrings.Str344Key)]
 		[MainCategory]
 		public DateTimeOffset? From { get; set; }
 
-		/// <summary>
-		/// End date, until which data needs to be retrieved.
-		/// </summary>
+		/// <inheritdoc />
 		[DataMember]
 		[DisplayNameLoc(LocalizedStrings.Str345Key)]
 		[DescriptionLoc(LocalizedStrings.Str346Key)]
 		[MainCategory]
 		public DateTimeOffset? To { get; set; }
 
+		DataType ISubscriptionMessage.DataType => DataType2;
+
+		private DataType _dataType2 = Messages.DataType.Level1;
+
+		/// <summary>
+		/// Market data type.
+		/// </summary>
+		[DataMember]
+		public DataType DataType2
+		{
+			get => _dataType2;
+			set => _dataType2 = value ?? throw new ArgumentNullException(nameof(value));
+		}
+
 		/// <summary>
 		/// Market data type.
 		/// </summary>
 		[Browsable(false)]
 		[DataMember]
-		public MarketDataTypes DataType { get; set; }
+		//[Obsolete("Use DataType2 property.")]
+		public new MarketDataTypes DataType
+		{
+#pragma warning disable CS0618 // Type or member is obsolete
+#pragma warning disable CS0612 // Type or member is obsolete
+			get => DataType2.ToMarketDataType();
+			set => DataType2 = value.ToDataType(Arg);
+#pragma warning restore CS0612 // Type or member is obsolete
+#pragma warning restore CS0618 // Type or member is obsolete
+		}
 
 		/// <summary>
 		/// Additional argument for market data request.
@@ -175,40 +210,31 @@ namespace StockSharp.Messages
 		[DisplayNameLoc(LocalizedStrings.Str347Key)]
 		[DescriptionLoc(LocalizedStrings.Str348Key)]
 		[MainCategory]
-		public object Arg { get; set; }
+		[Obsolete("Use DataType2 property.")]
+		public object Arg
+		{
+			get => DataType2.Arg;
+			set => DataType2 = Messages.DataType.Create(DataType2.MessageType, value);
+		}
 
-		/// <summary>
-		/// The message is market-data subscription.
-		/// </summary>
+		/// <inheritdoc />
 		[DataMember]
 		public bool IsSubscribe { get; set; }
 
-		/// <summary>
-		/// Request identifier.
-		/// </summary>
+		/// <inheritdoc />
 		[DataMember]
 		public long TransactionId { get; set; }
 
-		/// <summary>
-		/// The message is not supported by adapter. To be set if the answer.
-		/// </summary>
+		/// <inheritdoc />
 		[DataMember]
-		public bool IsNotSupported { get; set; }
+		public long? Skip { get; set; }
 
-		/// <summary>
-		/// Subscribe or unsubscribe error info. To be set if the answer.
-		/// </summary>
-		[DataMember]
-		public Exception Error { get; set; }
-
-		/// <summary>
-		/// Market-data count.
-		/// </summary>
+		/// <inheritdoc />
 		[DataMember]
 		public long? Count { get; set; }
 
 		/// <summary>
-		/// Max depth of requested order book. Uses in case <see cref="MarketDataMessage.DataType"/> = <see cref="MarketDataTypes.MarketDepth"/>.
+		/// Max depth of requested order book. Uses in case <see cref="DataType2"/> = <see cref="DataType.MarketDepth"/>.
 		/// </summary>
 		[DataMember]
 		public int? MaxDepth { get; set; }
@@ -231,11 +257,9 @@ namespace StockSharp.Messages
 		[DataMember]
 		public MarketDataBuildModes BuildMode { get; set; }
 
-		/// <summary>
-		/// Which market-data type is used as a source value.
-		/// </summary>
+		/// <inheritdoc />
 		[DataMember]
-		public MarketDataTypes? BuildFrom { get; set; }
+		public DataType BuildFrom { get; set; }
 
 		/// <summary>
 		/// Extra info for the <see cref="BuildFrom"/>.
@@ -253,21 +277,47 @@ namespace StockSharp.Messages
 		public bool AllowBuildFromSmallerTimeFrame { get; set; } = true;
 
 		/// <summary>
-		/// Request history market data only.
-		/// </summary>
-		[DataMember]
-		public bool IsHistory { get; set; }
-
-		/// <summary>
 		/// Use only the regular trading hours for which data will be requested.
 		/// </summary>
 		[DataMember]
 		public bool IsRegularTradingHours { get; set; }
 
 		/// <summary>
-		/// The default depth of order book.
+		/// Request <see cref="CandleStates.Finished"/> only candles.
 		/// </summary>
-		public const int DefaultMaxDepth = 50;
+		[DataMember]
+		public bool IsFinishedOnly { get; set; }
+
+		/// <summary>
+		/// Board code.
+		/// </summary>
+		[DataMember]
+		public string BoardCode { get; set; }
+
+		/// <summary>
+		/// Interval for data refresh.
+		/// </summary>
+		[DataMember]
+		public TimeSpan? RefreshSpeed { get; set; }
+
+		/// <summary>
+		/// Order log to market depth builder.
+		/// </summary>
+		public IOrderLogMarketDepthBuilder DepthBuilder { get; set; }
+		
+		/// <summary>
+		/// Try fill gaps.
+		/// </summary>
+		[DataMember]
+		public bool FillGaps { get; set; }
+
+		/// <summary>
+		/// Pass through incremental <see cref="QuoteChangeMessage"/>.
+		/// </summary>
+		[DataMember]
+		public bool DoNotBuildOrderBookInrement { get; set; }
+
+		bool ISubscriptionMessage.FilterEnabled => false;
 
 		/// <summary>
 		/// Initializes a new instance of the <see cref="MarketDataMessage"/>.
@@ -292,49 +342,66 @@ namespace StockSharp.Messages
 		/// <returns>Copy.</returns>
 		public override Message Clone()
 		{
-			var clone = new MarketDataMessage
-			{
-				Arg = Arg,
-				DataType = DataType,
-				Error = Error,
-				From = From,
-				To = To,
-				IsSubscribe = IsSubscribe,
-				TransactionId = TransactionId,
-				Count = Count,
-				MaxDepth = MaxDepth,
-				NewsId = NewsId,
-				LocalTime = LocalTime,
-				IsNotSupported = IsNotSupported,
-				BuildMode = BuildMode,
-				BuildFrom = BuildFrom,
-				BuildField = BuildField,
-				IsCalcVolumeProfile = IsCalcVolumeProfile,
-				IsHistory = IsHistory,
-				AllowBuildFromSmallerTimeFrame = AllowBuildFromSmallerTimeFrame,
-				IsRegularTradingHours = IsRegularTradingHours,
-			};
-
+			var clone = new MarketDataMessage();
 			CopyTo(clone);
-
 			return clone;
+		}
+
+		/// <summary>
+		/// Copy the message into the <paramref name="destination" />.
+		/// </summary>
+		/// <param name="destination">The object, to which copied information.</param>
+		public void CopyTo(MarketDataMessage destination)
+		{
+			base.CopyTo(destination);
+
+			destination.DataType2 = DataType2.TypedClone();
+			destination.From = From;
+			destination.To = To;
+			destination.IsSubscribe = IsSubscribe;
+			destination.TransactionId = TransactionId;
+			destination.Skip = Skip;
+			destination.Count = Count;
+			destination.MaxDepth = MaxDepth;
+			destination.NewsId = NewsId;
+			destination.BuildMode = BuildMode;
+			destination.BuildFrom = BuildFrom?.TypedClone();
+			destination.BuildField = BuildField;
+			destination.IsCalcVolumeProfile = IsCalcVolumeProfile;
+			destination.AllowBuildFromSmallerTimeFrame = AllowBuildFromSmallerTimeFrame;
+			destination.IsRegularTradingHours = IsRegularTradingHours;
+			destination.IsFinishedOnly = IsFinishedOnly;
+			destination.BoardCode = BoardCode;
+			destination.RefreshSpeed = RefreshSpeed;
+			destination.DepthBuilder = DepthBuilder;
+			destination.FillGaps = FillGaps;
+			destination.DoNotBuildOrderBookInrement = DoNotBuildOrderBookInrement;
 		}
 
 		/// <inheritdoc />
 		public override string ToString()
 		{
-			var str = base.ToString() + $",Sec={SecurityId},Type={DataType},IsSubscribe={IsSubscribe},Arg={Arg},TransId={TransactionId},OrigId={OriginalTransactionId}";
+			var str = base.ToString() + $",DataType={DataType2},IsSubscribe={IsSubscribe}";
 
-			if (MaxDepth != null)
+			if (TransactionId != default)
+				str += $",TransId={TransactionId}";
+
+			if (OriginalTransactionId != default)
+				str += $",OrigId={OriginalTransactionId}";
+
+			if (MaxDepth != default)
 				str += $",MaxDepth={MaxDepth}";
 
-			if (Count != null)
+			if (Skip != default)
+				str += $",Skip={Skip}";
+
+			if (Count != default)
 				str += $",Cnt={Count}";
 
-			if (From != null)
+			if (From != default)
 				str += $",From={From}";
 
-			if (To != null)
+			if (To != default)
 				str += $",To={To}";
 
 			if (BuildMode == MarketDataBuildModes.Build)
@@ -344,16 +411,25 @@ namespace StockSharp.Messages
 				str += $",SmallTF={AllowBuildFromSmallerTimeFrame}";
 
 			if (IsRegularTradingHours)
-				str += $",RegularTH={IsRegularTradingHours}";
+				str += $",RTH={IsRegularTradingHours}";
 
-			if (IsHistory)
-				str += $",Hist={IsHistory}";
+			if (IsFinishedOnly)
+				str += $",FinOnly={IsFinishedOnly}";
 
 			if (IsCalcVolumeProfile)
 				str += $",Profile={IsCalcVolumeProfile}";
 
-			if (Error != null)
-				str += $",Error={Error.Message}";
+			if (!BoardCode.IsEmpty())
+				str += $",BoardCode={BoardCode}";
+
+			if (RefreshSpeed != null)
+				str += $",Speed={RefreshSpeed}";
+
+			if (FillGaps)
+				str += $",Gaps={FillGaps}";
+
+			if (DoNotBuildOrderBookInrement)
+				str += $",NotBuildInc={DoNotBuildOrderBookInrement}";
 
 			return str;
 		}

@@ -87,15 +87,17 @@ namespace StockSharp.Algo.Testing
 
 				if (quote != null)
 				{
+					var v = quote.Value;
+
 					if (!_priceStepUpdated)
 					{
-						_securityDefinition.PriceStep = quote.Price.GetDecimalInfo().EffectiveScale.GetPriceStep();
+						_securityDefinition.PriceStep = v.Price.GetDecimalInfo().EffectiveScale.GetPriceStep();
 						_priceStepUpdated = true;
 					}
 
 					if (!_volumeStepUpdated)
 					{
-						_securityDefinition.VolumeStep = quote.Volume.GetDecimalInfo().EffectiveScale.GetPriceStep();
+						_securityDefinition.VolumeStep = v.Volume.GetDecimalInfo().EffectiveScale.GetPriceStep();
 						_volumeStepUpdated = true;
 					}
 				}
@@ -103,13 +105,7 @@ namespace StockSharp.Algo.Testing
 
 			_lastDepthDate = message.LocalTime.Date;
 
-			// чтобы склонировать внутренние котировки
-			//message = (QuoteChangeMessage)message.Clone();
-			// TODO для ускорения идет shallow copy котировок
-			var newBids = message.IsSorted ? message.Bids : message.Bids.OrderByDescending(q => q.Price);
-			var newAsks = message.IsSorted ? message.Asks : message.Asks.OrderBy(q => q.Price);
-
-			return ProcessQuoteChange(message.LocalTime, message.ServerTime, newBids.ToArray(), newAsks.ToArray());
+			return ProcessQuoteChange(message.LocalTime, message.ServerTime, message.Bids.ToArray(), message.Asks.ToArray());
 		}
 
 		private IEnumerable<ExecutionMessage> ProcessQuoteChange(DateTimeOffset time, DateTimeOffset serverTime, QuoteChange[] newBids, QuoteChange[] newAsks)
@@ -146,8 +142,8 @@ namespace StockSharp.Algo.Testing
 			var canProcessFrom = true;
 			var canProcessTo = true;
 
-			QuoteChange currFrom = null;
-			QuoteChange currTo = null;
+			QuoteChange? currFrom = null;
+			QuoteChange? currTo = null;
 
 			// TODO
 			//List<ExecutionMessage> currOrders = null;
@@ -180,7 +176,7 @@ namespace StockSharp.Algo.Testing
 							currTo = toEnum.Current;
 
 							if (newBestPrice == 0)
-								newBestPrice = currTo.Price;
+								newBestPrice = currTo.Value.Price;
 						}
 					}
 
@@ -190,7 +186,9 @@ namespace StockSharp.Algo.Testing
 							break;
 						else
 						{
-							AddExecMsg(diff, time, serverTime, currTo, currTo.Volume, false);
+							var v = currTo.Value;
+
+							AddExecMsg(diff, time, serverTime, v, v.Volume, side, false);
 							currTo = null;
 						}
 					}
@@ -198,28 +196,32 @@ namespace StockSharp.Algo.Testing
 					{
 						if (currTo == null)
 						{
-							AddExecMsg(diff, time, serverTime, currFrom, -currFrom.Volume, isSpread.Value);
+							var v = currFrom.Value;
+							AddExecMsg(diff, time, serverTime, v, -v.Volume, side, isSpread.Value);
 							currFrom = null;
 						}
 						else
 						{
-							if (currFrom.Price == currTo.Price)
+							var f = currFrom.Value;
+							var t = currTo.Value;
+
+							if (f.Price == t.Price)
 							{
-								if (currFrom.Volume != currTo.Volume)
+								if (f.Volume != t.Volume)
 								{
-									AddExecMsg(diff, time, serverTime, currTo, currTo.Volume - currFrom.Volume, isSpread.Value);
+									AddExecMsg(diff, time, serverTime, t, t.Volume - f.Volume, side, isSpread.Value);
 								}
 
 								currFrom = currTo = null;
 							}
-							else if (currFrom.Price * mult > currTo.Price * mult)
+							else if (f.Price * mult > t.Price * mult)
 							{
-								AddExecMsg(diff, time, serverTime, currTo, currTo.Volume, isSpread.Value);
+								AddExecMsg(diff, time, serverTime, t, t.Volume, side, isSpread.Value);
 								currTo = null;
 							}
 							else
 							{
-								AddExecMsg(diff, time, serverTime, currFrom, -currFrom.Volume, isSpread.Value);
+								AddExecMsg(diff, time, serverTime, f, -f.Volume, side, isSpread.Value);
 								currFrom = null;
 							}
 						}
@@ -230,10 +232,10 @@ namespace StockSharp.Algo.Testing
 
 		private readonly RandomArray<bool> _isMatch = new RandomArray<bool>(100);
 
-		private void AddExecMsg(List<ExecutionMessage> diff, DateTimeOffset time, DateTimeOffset serverTime, QuoteChange quote, decimal volume, bool isSpread)
+		private void AddExecMsg(List<ExecutionMessage> diff, DateTimeOffset time, DateTimeOffset serverTime, QuoteChange quote, decimal volume, Sides side, bool isSpread)
 		{
 			if (volume > 0)
-				diff.Add(CreateMessage(time, serverTime, quote.Side, quote.Price, volume));
+				diff.Add(CreateMessage(time, serverTime, side, quote.Price, volume));
 			else
 			{
 				volume = volume.Abs();
@@ -245,7 +247,7 @@ namespace StockSharp.Algo.Testing
 
 					diff.Add(new ExecutionMessage
 					{
-						Side = quote.Side,
+						Side = side,
 						TradeVolume = tradeVolume,
 						ExecutionType = ExecutionTypes.Tick,
 						SecurityId = SecurityId,
@@ -258,7 +260,7 @@ namespace StockSharp.Algo.Testing
 					//volume -= tradeVolume;
 				}
 
-				diff.Add(CreateMessage(time, serverTime, quote.Side, quote.Price, volume, true));
+				diff.Add(CreateMessage(time, serverTime, side, quote.Price, volume, true));
 			}
 		}
 
@@ -463,8 +465,8 @@ namespace StockSharp.Algo.Testing
 					SecurityId = message.SecurityId,
 					LocalTime = message.LocalTime,
 					ServerTime = message.ServerTime,
-					Bids = _prevBidPrice == null ? Enumerable.Empty<QuoteChange>() : new[] { new QuoteChange(Sides.Buy, _prevBidPrice.Value, _prevBidVolume ?? 0) },
-					Asks = _prevAskPrice == null ? Enumerable.Empty<QuoteChange>() : new[] { new QuoteChange(Sides.Sell, _prevAskPrice.Value, _prevAskVolume ?? 0) },
+					Bids = _prevBidPrice == null ? ArrayHelper.Empty<QuoteChange>() : new[] { new QuoteChange(_prevBidPrice.Value, _prevBidVolume ?? 0) },
+					Asks = _prevAskPrice == null ? ArrayHelper.Empty<QuoteChange>() : new[] { new QuoteChange(_prevAskPrice.Value, _prevAskVolume ?? 0) },
 				};
 			}
 		}
@@ -570,7 +572,7 @@ namespace StockSharp.Algo.Testing
 				OrderPrice = price,
 				OrderVolume = volume,
 				ExecutionType = ExecutionTypes.OrderLog,
-				IsCancelled = isCancelling,
+				IsCancellation = isCancelling,
 				SecurityId = SecurityId,
 				LocalTime = localTime,
 				ServerTime = serverTime,
@@ -621,7 +623,8 @@ namespace StockSharp.Algo.Testing
 						Side = regMsg.Side,
 						PortfolioName = regMsg.PortfolioName,
 						OrderType = regMsg.OrderType,
-						UserOrderId = regMsg.UserOrderId
+						UserOrderId = regMsg.UserOrderId,
+						StrategyId = regMsg.StrategyId,
 					};
 
 					yield break;
@@ -643,9 +646,9 @@ namespace StockSharp.Algo.Testing
 						SecurityId = replaceMsg.SecurityId,
 						ExecutionType = ExecutionTypes.Transaction,
 						HasOrderInfo = true,
-						IsCancelled = true,
+						IsCancellation = true,
 						OrderId = replaceMsg.OldOrderId,
-						OriginalTransactionId = replaceMsg.OldTransactionId,
+						OriginalTransactionId = replaceMsg.OriginalTransactionId,
 						TransactionId = replaceMsg.TransactionId,
 						PortfolioName = replaceMsg.PortfolioName,
 						OrderType = replaceMsg.OrderType,
@@ -666,7 +669,8 @@ namespace StockSharp.Algo.Testing
 						Side = replaceMsg.Side,
 						PortfolioName = replaceMsg.PortfolioName,
 						OrderType = replaceMsg.OrderType,
-						UserOrderId = replaceMsg.UserOrderId
+						UserOrderId = replaceMsg.UserOrderId,
+						StrategyId = replaceMsg.StrategyId,
 					};
 
 					yield break;
@@ -679,10 +683,10 @@ namespace StockSharp.Algo.Testing
 					{
 						ExecutionType = ExecutionTypes.Transaction,
 						HasOrderInfo = true,
-						IsCancelled = true,
+						IsCancellation = true,
 						OrderId = cancelMsg.OrderId,
 						TransactionId = cancelMsg.TransactionId,
-						OriginalTransactionId = cancelMsg.OrderTransactionId,
+						OriginalTransactionId = cancelMsg.OriginalTransactionId,
 						PortfolioName = cancelMsg.PortfolioName,
 						SecurityId = cancelMsg.SecurityId,
 						LocalTime = cancelMsg.LocalTime,
@@ -761,8 +765,11 @@ namespace StockSharp.Algo.Testing
 		{
 			_securityDefinition = securityDefinition ?? throw new ArgumentNullException(nameof(securityDefinition));
 
-			_priceStepUpdated = _securityDefinition.PriceStep != null;
-			_volumeStepUpdated = _securityDefinition.VolumeStep != null;
+			if (_securityDefinition.PriceStep != null)
+				_priceStepUpdated = true;
+
+			if (_securityDefinition.VolumeStep != null)
+				_volumeStepUpdated = true;
 		}
 	}
 }

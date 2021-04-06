@@ -25,6 +25,7 @@ namespace StockSharp.Algo.Candles.Compression
 	using StockSharp.Logging;
 	using StockSharp.Messages;
 	using StockSharp.Localization;
+	using StockSharp.BusinessEntities;
 
 	/// <summary>
 	/// Candles builder.
@@ -33,10 +34,8 @@ namespace StockSharp.Algo.Candles.Compression
 	public abstract class CandleBuilder<TCandleMessage> : BaseLogReceiver, ICandleBuilder
 		where TCandleMessage : CandleMessage
 	{
-		/// <summary>
-		/// The candle type.
-		/// </summary>
-		public abstract MarketDataTypes CandleType { get; }
+		/// <inheritdoc />
+		public virtual Type CandleType { get; } = typeof(TCandleMessage);
 
 		/// <summary>
 		/// Initialize <see cref="CandleBuilder{TCandleMessage}"/>.
@@ -52,23 +51,17 @@ namespace StockSharp.Algo.Candles.Compression
 		/// </summary>
 		protected IExchangeInfoProvider ExchangeInfoProvider { get; }
 
-		/// <summary>
-		/// To process the new data.
-		/// </summary>
-		/// <param name="message">Market-data message (uses as a subscribe/unsubscribe in outgoing case, confirmation event in incoming case).</param>
-		/// <param name="currentCandle">The current candle.</param>
-		/// <param name="transform">The data source transformation.</param>
-		/// <returns>A new candles changes.</returns>
-		public IEnumerable<CandleMessage> Process(MarketDataMessage message, CandleMessage currentCandle, ICandleBuilderValueTransform transform)
+		/// <inheritdoc />
+		public IEnumerable<CandleMessage> Process(ICandleBuilderSubscription subscription, ICandleBuilderValueTransform transform)
 		{
-			if (!IsTimeValid(message, transform.Time))
-				return Enumerable.Empty<CandleMessage>();
-
-			var changes = new List<CandleMessage>();
-
-			Process(message, currentCandle, transform, changes);
-
-			return changes;
+			if (IsTimeValid(subscription.Message, transform.Time))
+			{
+				foreach (var candle in OnProcess(subscription, transform))
+				{
+					subscription.CurrentCandle = candle;
+					yield return candle;
+				}
+			}
 		}
 
 		private bool IsTimeValid(MarketDataMessage message, DateTimeOffset time)
@@ -81,96 +74,97 @@ namespace StockSharp.Algo.Candles.Compression
 			if (board == null)
 				return true;
 
-			return board.IsTradeTime(time, out _);
+			return board.IsTradeTime(time, out _, out _);
 		}
 
 		/// <summary>
 		/// To process the new data.
 		/// </summary>
-		/// <param name="message">Market-data message (uses as a subscribe/unsubscribe in outgoing case, confirmation event in incoming case).</param>
-		/// <param name="currentCandle">The current candle.</param>
+		/// <param name="subscription">Subscription.</param>
 		/// <param name="transform">The data source transformation.</param>
-		/// <param name="changes">A new candles changes.</param>
-		public virtual void Process(MarketDataMessage message, CandleMessage currentCandle, ICandleBuilderValueTransform transform, IList<CandleMessage> changes)
+		/// <returns>A new candles changes.</returns>
+		protected virtual IEnumerable<TCandleMessage> OnProcess(ICandleBuilderSubscription subscription, ICandleBuilderValueTransform transform)
 		{
-			if (message == null)
-				throw new ArgumentNullException(nameof(message));
+			if (subscription is null)
+				throw new ArgumentNullException(nameof(subscription));
 
 			if (transform == null)
 				throw new ArgumentNullException(nameof(transform));
 
-			var candle = ProcessValue(message, (TCandleMessage)currentCandle, transform);
+			var currentCandle = (TCandleMessage)subscription.CurrentCandle;
+			var volumeProfile = subscription.VolumeProfile;
+
+			var candle = ProcessValue(subscription, transform);
 
 			if (candle == null)
 			{
 				// skip the value that cannot be processed
-				return;
+				yield break;
 			}
 
 			if (candle == currentCandle)
 			{
-				if (message.IsCalcVolumeProfile)
+				if (subscription.Message.IsCalcVolumeProfile)
 				{
-					if (candle.VolumeProfile == null)
+					if (volumeProfile == null)
 						throw new InvalidOperationException();
 
-					candle.VolumeProfile.Update(transform);
+					volumeProfile.Update(transform);
 				}
 
 				//candle.State = CandleStates.Changed;
-				changes.Add(candle);
+				yield return candle;
 			}
 			else
 			{
 				if (currentCandle != null)
 				{
 					currentCandle.State = CandleStates.Finished;
-					changes.Add(currentCandle);
+					yield return currentCandle;
 				}
 
-				if (message.IsCalcVolumeProfile)
+				if (subscription.Message.IsCalcVolumeProfile)
 				{
-					candle.VolumeProfile = new CandleMessageVolumeProfile();
-					candle.VolumeProfile.Update(transform);
+					var levels = new List<CandlePriceLevel>();
+
+					subscription.VolumeProfile = volumeProfile = new VolumeProfileBuilder(levels);
+					volumeProfile.Update(transform);
+
+					candle.PriceLevels = levels;
 				}
 
 				candle.State = CandleStates.Active;
-				changes.Add(candle);
+				yield return candle;
 			}
 		}
 
 		/// <summary>
 		/// To create a new candle.
 		/// </summary>
-		/// <param name="message">Market-data message (uses as a subscribe/unsubscribe in outgoing case, confirmation event in incoming case).</param>
-		/// <param name="currentCandle">The current candle.</param>
+		/// <param name="subscription">Subscription.</param>
 		/// <param name="transform">The data source transformation.</param>
 		/// <returns>Created candle.</returns>
-		protected virtual TCandleMessage CreateCandle(MarketDataMessage message, TCandleMessage currentCandle, ICandleBuilderValueTransform transform)
-		{
-			throw new NotSupportedException(LocalizedStrings.Str637);
-		}
+		protected virtual TCandleMessage CreateCandle(ICandleBuilderSubscription subscription, ICandleBuilderValueTransform transform)
+			=> throw new NotSupportedException(LocalizedStrings.Str637);
 
 		/// <summary>
 		/// Whether the candle is created before data adding.
 		/// </summary>
-		/// <param name="message">Market-data message (uses as a subscribe/unsubscribe in outgoing case, confirmation event in incoming case).</param>
+		/// <param name="subscription">Subscription.</param>
 		/// <param name="candle">Candle.</param>
 		/// <param name="transform">The data source transformation.</param>
 		/// <returns><see langword="true" /> if the candle should be finished. Otherwise, <see langword="false" />.</returns>
-		protected virtual bool IsCandleFinishedBeforeChange(MarketDataMessage message, TCandleMessage candle, ICandleBuilderValueTransform transform)
-		{
-			return false;
-		}
+		protected virtual bool IsCandleFinishedBeforeChange(ICandleBuilderSubscription subscription, TCandleMessage candle, ICandleBuilderValueTransform transform)
+			=> false;
 
 		/// <summary>
 		/// To fill in the initial candle settings.
 		/// </summary>
-		/// <param name="message">Market-data message (uses as a subscribe/unsubscribe in outgoing case, confirmation event in incoming case).</param>
+		/// <param name="subscription">Subscription.</param>
 		/// <param name="candle">Candle.</param>
 		/// <param name="transform">The data source transformation.</param>
 		/// <returns>Candle.</returns>
-		protected virtual TCandleMessage FirstInitCandle(MarketDataMessage message, TCandleMessage candle, ICandleBuilderValueTransform transform)
+		protected virtual TCandleMessage FirstInitCandle(ICandleBuilderSubscription subscription, TCandleMessage candle, ICandleBuilderValueTransform transform)
 		{
 			if (candle == null)
 				throw new ArgumentNullException(nameof(candle));
@@ -180,9 +174,9 @@ namespace StockSharp.Algo.Candles.Compression
 
 			var price = transform.Price;
 			var volume = transform.Volume;
-			var oi = transform.OpenInterest;
 
-			candle.SecurityId = message.SecurityId;
+			candle.BuildFrom = transform.BuildFrom;
+			candle.SecurityId = subscription.Message.SecurityId;
 
 			candle.OpenPrice = price;
 			candle.ClosePrice = price;
@@ -198,7 +192,10 @@ namespace StockSharp.Algo.Candles.Compression
 			if (volume != null)
 				candle.TotalVolume = volume.Value;
 
-			candle.OpenInterest = oi;
+			candle.OpenInterest = transform.OpenInterest;
+			candle.PriceLevels = transform.PriceLevels;
+
+			candle.TotalTicks = 1;
 
 			return candle;
 		}
@@ -206,15 +203,10 @@ namespace StockSharp.Algo.Candles.Compression
 		/// <summary>
 		/// To update the candle data.
 		/// </summary>
-		/// <param name="message">Market-data message (uses as a subscribe/unsubscribe in outgoing case, confirmation event in incoming case).</param>
+		/// <param name="subscription">Subscription.</param>
 		/// <param name="candle">Candle.</param>
 		/// <param name="transform">The data source transformation.</param>
-		protected virtual void UpdateCandle(MarketDataMessage message, TCandleMessage candle, ICandleBuilderValueTransform transform)
-		{
-			Update(candle, transform);
-		}
-
-		private static void Update(TCandleMessage candle, ICandleBuilderValueTransform transform)
+		protected virtual void UpdateCandle(ICandleBuilderSubscription subscription, TCandleMessage candle, ICandleBuilderValueTransform transform)
 		{
 			if (candle == null)
 				throw new ArgumentNullException(nameof(candle));
@@ -225,7 +217,6 @@ namespace StockSharp.Algo.Candles.Compression
 			var price = transform.Price;
 			var time = transform.Time;
 			var volume = transform.Volume;
-			var oi = transform.OpenInterest;
 
 			if (price < candle.LowPrice)
 			{
@@ -259,26 +250,74 @@ namespace StockSharp.Algo.Candles.Compression
 
 			candle.CloseTime = time;
 
-			candle.OpenInterest = oi;
+			candle.OpenInterest = transform.OpenInterest;
+
+			if (transform.PriceLevels != null)
+			{
+				if (candle.PriceLevels == null)
+					candle.PriceLevels = transform.PriceLevels;
+				else
+				{
+					var dict = candle.PriceLevels.ToDictionary(l => l.Price);
+
+					foreach (var level in transform.PriceLevels)
+					{
+						if (dict.TryGetValue(level.Price, out var currLevel))
+						{
+							currLevel.BuyCount += level.BuyCount;
+							currLevel.SellCount += level.SellCount;
+							currLevel.BuyVolume += level.BuyVolume;
+							currLevel.SellVolume += level.SellVolume;
+							currLevel.TotalVolume += level.TotalVolume;
+							
+							if (level.BuyVolumes != null)
+							{
+								if (currLevel.BuyVolumes == null)
+									currLevel.BuyVolumes = level.BuyVolumes.ToArray();
+								else
+									currLevel.BuyVolumes = currLevel.BuyVolumes.Concat(level.BuyVolumes).ToArray();
+							}
+
+							if (currLevel.SellVolumes != null && level.SellVolumes != null)
+							{
+								if (currLevel.SellVolumes == null)
+									currLevel.SellVolumes = level.SellVolumes.ToArray();
+								else
+									currLevel.SellVolumes = currLevel.SellVolumes.Concat(level.SellVolumes).ToArray();
+							}
+						}
+						else
+							dict.Add(level.Price, level);
+					}
+
+					candle.PriceLevels = dict.Values.ToArray();
+				}
+			}
+
+			if (candle.TotalTicks != null)
+				candle.TotalTicks++;
+			else
+				candle.TotalTicks = 1;
 		}
 
 		/// <summary>
 		/// To process the new data.
 		/// </summary>
-		/// <param name="message">Market-data message (uses as a subscribe/unsubscribe in outgoing case, confirmation event in incoming case).</param>
-		/// <param name="currentCandle">The current candle.</param>
+		/// <param name="subscription">Subscription.</param>
 		/// <param name="transform">The data source transformation.</param>
-		/// <returns>A new candle. If there is not necessary to create a new candle, then <paramref name="currentCandle" /> is returned. If it is impossible to create a new candle (<paramref name="transform" /> cannot be applied to candles), then <see langword="null" /> is returned.</returns>
-		protected virtual TCandleMessage ProcessValue(MarketDataMessage message, TCandleMessage currentCandle, ICandleBuilderValueTransform transform)
+		/// <returns>A new candle. If there is not necessary to create a new candle, then <see cref="ICandleBuilderSubscription.CurrentCandle" /> is returned. If it is impossible to create a new candle (<paramref name="transform" /> cannot be applied to candles), then <see langword="null" /> is returned.</returns>
+		protected virtual TCandleMessage ProcessValue(ICandleBuilderSubscription subscription, ICandleBuilderValueTransform transform)
 		{
-			if (currentCandle == null || IsCandleFinishedBeforeChange(message, currentCandle, transform))
+			var currentCandle = (TCandleMessage)subscription.CurrentCandle;
+
+			if (currentCandle == null || IsCandleFinishedBeforeChange(subscription, currentCandle, transform))
 			{
-				currentCandle = CreateCandle(message, currentCandle, transform);
+				currentCandle = CreateCandle(subscription, transform);
 				this.AddDebugLog("NewCandle {0} ForValue {1}", currentCandle, transform);
 				return currentCandle;
 			}
 
-			UpdateCandle(message, currentCandle, transform);
+			UpdateCandle(subscription, currentCandle, transform);
 
 			// TODO performance
 			//this.AddDebugLog("UpdatedCandle {0} ForValue {1}", currentCandle, value);
@@ -414,11 +453,6 @@ namespace StockSharp.Algo.Candles.Compression
 		//private readonly SynchronizedDictionary<CandleSeries, TimeoutInfo> _timeoutInfos = new SynchronizedDictionary<CandleSeries, TimeoutInfo>();
 
 		/// <summary>
-		/// The candle type.
-		/// </summary>
-		public override MarketDataTypes CandleType => MarketDataTypes.CandleTimeFrame;
-
-		/// <summary>
 		/// Whether to create empty candles (<see cref="CandleStates.None"/>) in the lack of trades. The default mode is enabled.
 		/// </summary>
 		public bool GenerateEmptyCandles { get; set; }
@@ -463,18 +497,12 @@ namespace StockSharp.Algo.Candles.Compression
 		//	_timeoutInfos.Clear();
 		//}
 
-		/// <summary>
-		/// To create a new candle.
-		/// </summary>
-		/// <param name="message">Market-data message (uses as a subscribe/unsubscribe in outgoing case, confirmation event in incoming case).</param>
-		/// <param name="currentCandle">The current candle.</param>
-		/// <param name="transform">The data source transformation.</param>
-		/// <returns>Created candle.</returns>
-		protected override TimeFrameCandleMessage CreateCandle(MarketDataMessage message, TimeFrameCandleMessage currentCandle, ICandleBuilderValueTransform transform)
+		/// <inheritdoc />
+		protected override TimeFrameCandleMessage CreateCandle(ICandleBuilderSubscription subscription, ICandleBuilderValueTransform transform)
 		{
-			var timeFrame = (TimeSpan)message.Arg;
+			var timeFrame = subscription.Message.GetTimeFrame();
 
-			var board = ExchangeInfoProvider.GetOrCreateBoard(message.SecurityId.BoardCode);
+			var board = subscription.Message.IsRegularTradingHours ? ExchangeInfoProvider.GetOrCreateBoard(subscription.Message.SecurityId.BoardCode) : ExchangeBoard.Associated;
 			var bounds = timeFrame.GetCandleBounds(transform.Time, board, board.WorkingTime);
 
 			if (transform.Time < bounds.Min)
@@ -482,7 +510,7 @@ namespace StockSharp.Algo.Candles.Compression
 
 			var openTime = bounds.Min;
 
-			var candle = FirstInitCandle(message, new TimeFrameCandleMessage
+			var candle = FirstInitCandle(subscription, new TimeFrameCandleMessage
 			{
 				TimeFrame = timeFrame,
 				OpenTime = openTime,
@@ -494,14 +522,8 @@ namespace StockSharp.Algo.Candles.Compression
 			return candle;
 		}
 
-		/// <summary>
-		/// Whether the candle is created before data adding.
-		/// </summary>
-		/// <param name="message">Market-data message (uses as a subscribe/unsubscribe in outgoing case, confirmation event in incoming case).</param>
-		/// <param name="candle">Candle.</param>
-		/// <param name="transform">The data source transformation.</param>
-		/// <returns><see langword="true" /> if the candle should be finished. Otherwise, <see langword="false" />.</returns>
-		protected override bool IsCandleFinishedBeforeChange(MarketDataMessage message, TimeFrameCandleMessage candle, ICandleBuilderValueTransform transform)
+		/// <inheritdoc />
+		protected override bool IsCandleFinishedBeforeChange(ICandleBuilderSubscription subscription, TimeFrameCandleMessage candle, ICandleBuilderValueTransform transform)
 		{
 			return transform.Time < candle.OpenTime || (candle.OpenTime + candle.TimeFrame) <= transform.Time;
 		}
@@ -513,11 +535,6 @@ namespace StockSharp.Algo.Candles.Compression
 	public class TickCandleBuilder : CandleBuilder<TickCandleMessage>
 	{
 		/// <summary>
-		/// The candle type.
-		/// </summary>
-		public override MarketDataTypes CandleType => MarketDataTypes.CandleTick;
-
-		/// <summary>
 		/// Initializes a new instance of the <see cref="TickCandleBuilder"/>.
 		/// </summary>
 		/// <param name="exchangeInfoProvider">The exchange boards provider.</param>
@@ -526,56 +543,25 @@ namespace StockSharp.Algo.Candles.Compression
 		{
 		}
 
-		/// <summary>
-		/// To create a new candle.
-		/// </summary>
-		/// <param name="message">Market-data message (uses as a subscribe/unsubscribe in outgoing case, confirmation event in incoming case).</param>
-		/// <param name="currentCandle">The current candle.</param>
-		/// <param name="transform">The data source transformation.</param>
-		/// <returns>Created candle.</returns>
-		protected override TickCandleMessage CreateCandle(MarketDataMessage message, TickCandleMessage currentCandle, ICandleBuilderValueTransform transform)
+		/// <inheritdoc />
+		protected override TickCandleMessage CreateCandle(ICandleBuilderSubscription subscription, ICandleBuilderValueTransform transform)
 		{
 			var time = transform.Time;
 
-			return FirstInitCandle(message, new TickCandleMessage
+			return FirstInitCandle(subscription, new TickCandleMessage
 			{
-				MaxTradeCount = (int)message.Arg,
+				MaxTradeCount = subscription.Message.GetArg<int>(),
 				OpenTime = time,
 				CloseTime = time,
 				HighTime = time,
 				LowTime = time,
-				TotalTicks = 1,
 			}, transform);
 		}
 
-		/// <summary>
-		/// Whether the candle is created before data adding.
-		/// </summary>
-		/// <param name="message">Market-data message (uses as a subscribe/unsubscribe in outgoing case, confirmation event in incoming case).</param>
-		/// <param name="candle">Candle.</param>
-		/// <param name="transform">The data source transformation.</param>
-		/// <returns><see langword="true" /> if the candle should be finished. Otherwise, <see langword="false" />.</returns>
-		protected override bool IsCandleFinishedBeforeChange(MarketDataMessage message, TickCandleMessage candle, ICandleBuilderValueTransform transform)
+		/// <inheritdoc />
+		protected override bool IsCandleFinishedBeforeChange(ICandleBuilderSubscription subscription, TickCandleMessage candle, ICandleBuilderValueTransform transform)
 		{
 			return candle.TotalTicks != null && candle.TotalTicks.Value >= candle.MaxTradeCount;
-		}
-
-		/// <summary>
-		/// To update the candle data.
-		/// </summary>
-		/// <param name="message">Market-data message (uses as a subscribe/unsubscribe in outgoing case, confirmation event in incoming case).</param>
-		/// <param name="candle">Candle.</param>
-		/// <param name="transform">The data source transformation.</param>
-		protected override void UpdateCandle(MarketDataMessage message, TickCandleMessage candle, ICandleBuilderValueTransform transform)
-		{
-			base.UpdateCandle(message, candle, transform);
-
-			var ticks = candle.TotalTicks;
-
-			if (ticks == null)
-				throw new InvalidOperationException();
-
-			candle.TotalTicks = ticks.Value + 1;
 		}
 	}
 
@@ -585,11 +571,6 @@ namespace StockSharp.Algo.Candles.Compression
 	public class VolumeCandleBuilder : CandleBuilder<VolumeCandleMessage>
 	{
 		/// <summary>
-		/// The candle type.
-		/// </summary>
-		public override MarketDataTypes CandleType => MarketDataTypes.CandleVolume;
-
-		/// <summary>
 		/// Initializes a new instance of the <see cref="VolumeCandleBuilder"/>.
 		/// </summary>
 		/// <param name="exchangeInfoProvider">The exchange boards provider.</param>
@@ -598,20 +579,14 @@ namespace StockSharp.Algo.Candles.Compression
 		{
 		}
 
-		/// <summary>
-		/// To create a new candle.
-		/// </summary>
-		/// <param name="message">Market-data message (uses as a subscribe/unsubscribe in outgoing case, confirmation event in incoming case).</param>
-		/// <param name="currentCandle">The current candle.</param>
-		/// <param name="transform">The data source transformation.</param>
-		/// <returns>Created candle.</returns>
-		protected override VolumeCandleMessage CreateCandle(MarketDataMessage message, VolumeCandleMessage currentCandle, ICandleBuilderValueTransform transform)
+		/// <inheritdoc />
+		protected override VolumeCandleMessage CreateCandle(ICandleBuilderSubscription subscription, ICandleBuilderValueTransform transform)
 		{
 			var time = transform.Time;
 
-			return FirstInitCandle(message, new VolumeCandleMessage
+			return FirstInitCandle(subscription, new VolumeCandleMessage
 			{
-				Volume = (decimal)message.Arg,
+				Volume = subscription.Message.GetArg<decimal>(),
 				OpenTime = time,
 				CloseTime = time,
 				HighTime = time,
@@ -619,14 +594,8 @@ namespace StockSharp.Algo.Candles.Compression
 			}, transform);
 		}
 
-		/// <summary>
-		/// Whether the candle is created before data adding.
-		/// </summary>
-		/// <param name="message">Market-data message (uses as a subscribe/unsubscribe in outgoing case, confirmation event in incoming case).</param>
-		/// <param name="candle">Candle.</param>
-		/// <param name="transform">The data source transformation.</param>
-		/// <returns><see langword="true" /> if the candle should be finished. Otherwise, <see langword="false" />.</returns>
-		protected override bool IsCandleFinishedBeforeChange(MarketDataMessage message, VolumeCandleMessage candle, ICandleBuilderValueTransform transform)
+		/// <inheritdoc />
+		protected override bool IsCandleFinishedBeforeChange(ICandleBuilderSubscription subscription, VolumeCandleMessage candle, ICandleBuilderValueTransform transform)
 		{
 			return candle.TotalVolume >= candle.Volume;
 		}
@@ -638,11 +607,6 @@ namespace StockSharp.Algo.Candles.Compression
 	public class RangeCandleBuilder : CandleBuilder<RangeCandleMessage>
 	{
 		/// <summary>
-		/// The candle type.
-		/// </summary>
-		public override MarketDataTypes CandleType => MarketDataTypes.CandleRange;
-
-		/// <summary>
 		/// Initializes a new instance of the <see cref="RangeCandleBuilder"/>.
 		/// </summary>
 		/// <param name="exchangeInfoProvider">The exchange boards provider.</param>
@@ -651,20 +615,14 @@ namespace StockSharp.Algo.Candles.Compression
 		{
 		}
 
-		/// <summary>
-		/// To create a new candle.
-		/// </summary>
-		/// <param name="message">Market-data message (uses as a subscribe/unsubscribe in outgoing case, confirmation event in incoming case).</param>
-		/// <param name="currentCandle">The current candle.</param>
-		/// <param name="transform">The data source transformation.</param>
-		/// <returns>Created candle.</returns>
-		protected override RangeCandleMessage CreateCandle(MarketDataMessage message, RangeCandleMessage currentCandle, ICandleBuilderValueTransform transform)
+		/// <inheritdoc />
+		protected override RangeCandleMessage CreateCandle(ICandleBuilderSubscription subscription, ICandleBuilderValueTransform transform)
 		{
 			var time = transform.Time;
 
-			return FirstInitCandle(message, new RangeCandleMessage
+			return FirstInitCandle(subscription, new RangeCandleMessage
 			{
-				PriceRange = (Unit)message.Arg,
+				PriceRange = subscription.Message.GetArg<Unit>(),
 				OpenTime = time,
 				CloseTime = time,
 				HighTime = time,
@@ -672,14 +630,8 @@ namespace StockSharp.Algo.Candles.Compression
 			}, transform);
 		}
 
-		/// <summary>
-		/// Whether the candle is created before data adding.
-		/// </summary>
-		/// <param name="message">Market-data message (uses as a subscribe/unsubscribe in outgoing case, confirmation event in incoming case).</param>
-		/// <param name="candle">Candle.</param>
-		/// <param name="transform">The data source transformation.</param>
-		/// <returns><see langword="true" /> if the candle should be finished. Otherwise, <see langword="false" />.</returns>
-		protected override bool IsCandleFinishedBeforeChange(MarketDataMessage message, RangeCandleMessage candle, ICandleBuilderValueTransform transform)
+		/// <inheritdoc />
+		protected override bool IsCandleFinishedBeforeChange(ICandleBuilderSubscription subscription, RangeCandleMessage candle, ICandleBuilderValueTransform transform)
 		{
 			return (decimal)(candle.LowPrice + candle.PriceRange) <= candle.HighPrice;
 		}
@@ -691,11 +643,6 @@ namespace StockSharp.Algo.Candles.Compression
 	public class PnFCandleBuilder : CandleBuilder<PnFCandleMessage>
 	{
 		/// <summary>
-		/// The candle type.
-		/// </summary>
-		public override MarketDataTypes CandleType => MarketDataTypes.CandlePnF;
-
-		/// <summary>
 		/// Initializes a new instance of the <see cref="PnFCandleBuilder"/>.
 		/// </summary>
 		/// <param name="exchangeInfoProvider">The exchange boards provider.</param>
@@ -705,32 +652,34 @@ namespace StockSharp.Algo.Candles.Compression
 		}
 
 		/// <inheritdoc />
-		public override void Process(MarketDataMessage message, CandleMessage currentCandle, ICandleBuilderValueTransform transform, IList<CandleMessage> changes)
+		protected override IEnumerable<PnFCandleMessage> OnProcess(ICandleBuilderSubscription subscription, ICandleBuilderValueTransform transform)
 		{
-			var currentPnFCandle = (PnFCandleMessage)currentCandle;
+			var currentPnFCandle = (PnFCandleMessage)subscription.CurrentCandle;
 
 			var price = transform.Price;
 			var volume = transform.Volume;
 			var time = transform.Time;
 			var side = transform.Side;
 			var oi = transform.OpenInterest;
+			var buildFrom = transform.BuildFrom;
 
-			var pnf = (PnFArg)message.Arg;
+			var pnf = subscription.Message.GetArg<PnFArg>();
 			var pnfStep = (decimal)(1 * pnf.BoxSize);
 
 			if (currentPnFCandle == null)
 			{
-				var openPrice = MathHelper.Floor(price, pnfStep);
+				var openPrice = price.Floor(pnfStep);
 				var highPrice = openPrice + pnfStep;
 
-				changes.Add(CreateCandle(message, pnf, openPrice, highPrice, openPrice, highPrice, price, volume, side, time, oi));
+				currentPnFCandle = CreateCandle(subscription, buildFrom, pnf, openPrice, highPrice, openPrice, highPrice, price, volume, side, time, oi);
+				yield return currentPnFCandle;
 			}
 			else
 			{
 				if (currentPnFCandle.LowPrice <= price && price <= currentPnFCandle.HighPrice)
 				{
-					UpdateCandle(currentPnFCandle, price, volume, time, side, oi);
-					changes.Add(currentPnFCandle);
+					UpdateCandle(currentPnFCandle, price, volume, time, side, oi, subscription.VolumeProfile);
+					yield return currentPnFCandle;
 				}
 				else
 				{
@@ -740,57 +689,57 @@ namespace StockSharp.Algo.Candles.Compression
 					{
 						if (price > currentPnFCandle.HighPrice)
 						{
-							currentPnFCandle.HighPrice = currentPnFCandle.ClosePrice = MathHelper.Floor(price, pnfStep) + pnfStep;
-							UpdateCandle(currentPnFCandle, price, volume, time, side, oi);
-							changes.Add(currentPnFCandle);
+							currentPnFCandle.HighPrice = currentPnFCandle.ClosePrice = price.Floor(pnfStep) + pnfStep;
+							UpdateCandle(currentPnFCandle, price, volume, time, side, oi, subscription.VolumeProfile);
+							yield return currentPnFCandle;
 						}
 						else if (price < (currentPnFCandle.HighPrice - pnfStep * pnf.ReversalAmount))
 						{
 							currentPnFCandle.State = CandleStates.Finished;
-							changes.Add(currentPnFCandle);
+							yield return currentPnFCandle;
 
 							var highPrice = currentPnFCandle.HighPrice - pnfStep;
-							var lowPrice = MathHelper.Floor(price, pnfStep);
+							var lowPrice = price.Floor(pnfStep);
 
-							currentPnFCandle = CreateCandle(message, pnf, highPrice, highPrice, lowPrice, lowPrice, price, volume, side, time, oi);
-							changes.Add(currentPnFCandle);
+							currentPnFCandle = CreateCandle(subscription, buildFrom, pnf, highPrice, highPrice, lowPrice, lowPrice, price, volume, side, time, oi);
+							yield return currentPnFCandle;
 						}
 						else
 						{
-							UpdateCandle(currentPnFCandle, price, volume, time, side, oi);
-							changes.Add(currentPnFCandle);
+							UpdateCandle(currentPnFCandle, price, volume, time, side, oi, subscription.VolumeProfile);
+							yield return currentPnFCandle;
 						}
 					}
 					else
 					{
 						if (price < currentPnFCandle.LowPrice)
 						{
-							currentPnFCandle.LowPrice = currentPnFCandle.ClosePrice = MathHelper.Floor(price, pnfStep);
-							UpdateCandle(currentPnFCandle, price, volume, time, side, oi);
-							changes.Add(currentPnFCandle);
+							currentPnFCandle.LowPrice = currentPnFCandle.ClosePrice = price.Floor(pnfStep);
+							UpdateCandle(currentPnFCandle, price, volume, time, side, oi, subscription.VolumeProfile);
+							yield return currentPnFCandle;
 						}
 						else if (price > (currentPnFCandle.LowPrice + pnfStep * pnf.ReversalAmount))
 						{
 							currentPnFCandle.State = CandleStates.Finished;
-							changes.Add(currentPnFCandle);
+							yield return currentPnFCandle;
 
-							var highPrice = MathHelper.Floor(price, pnfStep) + pnfStep;
+							var highPrice = price.Floor(pnfStep) + pnfStep;
 							var lowPrice = currentPnFCandle.LowPrice + pnfStep;
 
-							currentPnFCandle = CreateCandle(message, pnf, lowPrice, highPrice, lowPrice, highPrice, price, volume, side, time, oi);
-							changes.Add(currentPnFCandle);
+							currentPnFCandle = CreateCandle(subscription, buildFrom, pnf, lowPrice, highPrice, lowPrice, highPrice, price, volume, side, time, oi);
+							yield return currentPnFCandle;
 						}
 						else
 						{
-							UpdateCandle(currentPnFCandle, price, volume, time, side, oi);
-							changes.Add(currentPnFCandle);
+							UpdateCandle(currentPnFCandle, price, volume, time, side, oi, subscription.VolumeProfile);
+							yield return currentPnFCandle;
 						}
 					}
 				}
 			}
 		}
 
-		private static void UpdateCandle(PnFCandleMessage currentPnFCandle, decimal price, decimal? volume, DateTimeOffset time, Sides? side, decimal? oi)
+		private static void UpdateCandle(PnFCandleMessage currentPnFCandle, decimal price, decimal? volume, DateTimeOffset time, Sides? side, decimal? oi, VolumeProfileBuilder volumeProfile)
 		{
 			currentPnFCandle.TotalTicks = currentPnFCandle.TotalTicks ?? 0 + 1;
 
@@ -807,15 +756,19 @@ namespace StockSharp.Algo.Candles.Compression
 			currentPnFCandle.CloseVolume = volume;
 			currentPnFCandle.CloseTime = time;
 
-			currentPnFCandle.VolumeProfile?.Update(price, volume, side);
+			volumeProfile?.Update(price, volume, side);
 
 			currentPnFCandle.OpenInterest = oi;
 		}
 
-		private static PnFCandleMessage CreateCandle(MarketDataMessage message, PnFArg pnfArg, decimal openPrice, decimal highPrice, decimal lowPrice, decimal closePrice, decimal price, decimal? volume, Sides? side, DateTimeOffset time, decimal? oi)
+		private static PnFCandleMessage CreateCandle(ICandleBuilderSubscription subscription, DataType buildFrom, PnFArg pnfArg, decimal openPrice, decimal highPrice, decimal lowPrice, decimal closePrice, decimal price, decimal? volume, Sides? side, DateTimeOffset time, decimal? oi)
 		{
 			var candle = new PnFCandleMessage
 			{
+				SecurityId = subscription.Message.SecurityId,
+				PnFArg = pnfArg,
+				BuildFrom = buildFrom,
+
 				OpenPrice = openPrice,
 				ClosePrice = closePrice,
 				HighPrice = highPrice,
@@ -824,19 +777,21 @@ namespace StockSharp.Algo.Candles.Compression
 				//CloseVolume = volume,
 				HighVolume = volume,
 				LowVolume = volume,
-				SecurityId = message.SecurityId,
 				OpenTime = time,
 				//CloseTime = time,
 				HighTime = time,
 				LowTime = time,
-				PnFArg = pnfArg,
 				State = CandleStates.Active,
 			};
 
-			if (message.IsCalcVolumeProfile)
-				candle.VolumeProfile = new CandleMessageVolumeProfile();
+			if (subscription.Message.IsCalcVolumeProfile)
+			{
+				var levels = new List<CandlePriceLevel>();
+				subscription.VolumeProfile = new VolumeProfileBuilder(levels);
+				candle.PriceLevels = levels;
+			}
 
-			UpdateCandle(candle, price, volume, time, side, oi);
+			UpdateCandle(candle, price, volume, time, side, oi, subscription.VolumeProfile);
 
 			return candle;
 		}
@@ -848,11 +803,6 @@ namespace StockSharp.Algo.Candles.Compression
 	public class RenkoCandleBuilder : CandleBuilder<RenkoCandleMessage>
 	{
 		/// <summary>
-		/// The candle type.
-		/// </summary>
-		public override MarketDataTypes CandleType => MarketDataTypes.CandleRenko;
-
-		/// <summary>
 		/// Initializes a new instance of the <see cref="RenkoCandleBuilder"/>.
 		/// </summary>
 		/// <param name="exchangeInfoProvider">The exchange boards provider.</param>
@@ -862,24 +812,26 @@ namespace StockSharp.Algo.Candles.Compression
 		}
 
 		/// <inheritdoc />
-		public override void Process(MarketDataMessage message, CandleMessage currentCandle, ICandleBuilderValueTransform transform, IList<CandleMessage> changes)
+		protected override IEnumerable<RenkoCandleMessage> OnProcess(ICandleBuilderSubscription subscription, ICandleBuilderValueTransform transform)
 		{
-			var currentRenkoCandle = (RenkoCandleMessage)currentCandle;
+			var currentRenkoCandle = (RenkoCandleMessage)subscription.CurrentCandle;
 
 			var price = transform.Price;
 			var volume = transform.Volume;
 			var time = transform.Time;
 			var side = transform.Side;
 			var oi = transform.OpenInterest;
+			var buildFrom = transform.BuildFrom;
 
-			var boxSize = (Unit)message.Arg;
+			var boxSize = subscription.Message.GetArg<Unit>();
 			var renkoStep = (decimal)(1 * boxSize);
 
 			if (currentRenkoCandle == null)
 			{
-				var openPrice = MathHelper.Floor(price, renkoStep);
+				var openPrice = price.Floor(renkoStep);
 
-				changes.Add(CreateCandle(message, boxSize, openPrice, renkoStep, price, volume, side, time, oi));
+				currentRenkoCandle = CreateCandle(subscription, buildFrom, boxSize, openPrice, renkoStep, price, volume, side, time, oi);
+				yield return currentRenkoCandle;
 			}
 			else
 			{
@@ -898,16 +850,16 @@ namespace StockSharp.Algo.Candles.Compression
 					currentRenkoCandle.CloseVolume = volume;
 					currentRenkoCandle.CloseTime = time;
 
-					currentRenkoCandle.VolumeProfile?.Update(price, volume, side);
+					subscription.VolumeProfile?.Update(price, volume, side);
 
 					currentRenkoCandle.OpenInterest = oi;
 
-					changes.Add(currentRenkoCandle);
+					yield return currentRenkoCandle;
 				}
 				else
 				{
 					currentRenkoCandle.State = CandleStates.Finished;
-					changes.Add(currentRenkoCandle);
+					yield return currentRenkoCandle;
 
 					int times;
 					bool isUp;
@@ -930,14 +882,16 @@ namespace StockSharp.Algo.Candles.Compression
 					{
 						if (isUp)
 						{
-							currentRenkoCandle = CreateCandle(message, boxSize, openPrice, renkoStep, price, volume, side, time, oi);
-							changes.Add(currentRenkoCandle);
+							currentRenkoCandle = CreateCandle(subscription, buildFrom, boxSize, openPrice, renkoStep, price, volume, side, time, oi);
+							yield return currentRenkoCandle;
+
 							openPrice += renkoStep;
 						}
 						else
 						{
-							currentRenkoCandle = CreateCandle(message, boxSize, openPrice, -renkoStep, price, volume, side, time, oi);
-							changes.Add(currentRenkoCandle);
+							currentRenkoCandle = CreateCandle(subscription, buildFrom, boxSize, openPrice, -renkoStep, price, volume, side, time, oi);
+							yield return currentRenkoCandle;
+
 							openPrice -= renkoStep;
 						}
 
@@ -949,10 +903,14 @@ namespace StockSharp.Algo.Candles.Compression
 			}
 		}
 
-		private static RenkoCandleMessage CreateCandle(MarketDataMessage message, Unit boxSize, decimal openPrice, decimal renkoStep, decimal price, decimal? volume, Sides? side, DateTimeOffset time, decimal? oi)
+		private static RenkoCandleMessage CreateCandle(ICandleBuilderSubscription subscription, DataType buildFrom, Unit boxSize, decimal openPrice, decimal renkoStep, decimal price, decimal? volume, Sides? side, DateTimeOffset time, decimal? oi)
 		{
 			var candle = new RenkoCandleMessage
 			{
+				SecurityId = subscription.Message.SecurityId,
+				BoxSize = boxSize,
+				BuildFrom = buildFrom,
+
 				OpenPrice = openPrice,
 				ClosePrice = openPrice + renkoStep,
 				//HighPrice = openPrice + renkoStep,
@@ -961,12 +919,10 @@ namespace StockSharp.Algo.Candles.Compression
 				CloseVolume = volume,
 				HighVolume = volume,
 				LowVolume = volume,
-				SecurityId = message.SecurityId,
 				OpenTime = time,
 				CloseTime = time,
 				HighTime = time,
 				LowTime = time,
-				BoxSize = boxSize,
 				RelativeVolume = side == null ? null : (side == Sides.Buy ? volume : -volume),
 				TotalTicks = 1,
 				State = CandleStates.Active,
@@ -990,13 +946,75 @@ namespace StockSharp.Algo.Candles.Compression
 				candle.LowPrice = candle.ClosePrice;
 			}
 
-			if (message.IsCalcVolumeProfile)
+			if (subscription.Message.IsCalcVolumeProfile)
 			{
-				candle.VolumeProfile = new CandleMessageVolumeProfile();
-				candle.VolumeProfile.Update(price, volume, side);
+				var levels = new List<CandlePriceLevel>();
+
+				subscription.VolumeProfile = new VolumeProfileBuilder(levels);
+				subscription.VolumeProfile.Update(price, volume, side);
+
+				candle.PriceLevels = levels;
 			}
 
 			return candle;
+		}
+	}
+
+	/// <summary>
+	/// The builder of candles of <see cref="HeikinAshiCandleBuilder"/> type.
+	/// </summary>
+	public class HeikinAshiCandleBuilder : CandleBuilder<HeikinAshiCandleMessage>
+	{
+		/// <summary>
+		/// Initializes a new instance of the <see cref="HeikinAshiCandleBuilder"/>.
+		/// </summary>
+		/// <param name="exchangeInfoProvider">The exchange boards provider.</param>
+		public HeikinAshiCandleBuilder(IExchangeInfoProvider exchangeInfoProvider)
+			: base(exchangeInfoProvider)
+		{
+		}
+
+		/// <inheritdoc />
+		protected override HeikinAshiCandleMessage CreateCandle(ICandleBuilderSubscription subscription, ICandleBuilderValueTransform transform)
+		{
+			var timeFrame = subscription.Message.GetTimeFrame();
+
+			var board = subscription.Message.IsRegularTradingHours ? ExchangeInfoProvider.GetOrCreateBoard(subscription.Message.SecurityId.BoardCode) : ExchangeBoard.Associated;
+			var bounds = timeFrame.GetCandleBounds(transform.Time, board, board.WorkingTime);
+
+			if (transform.Time < bounds.Min)
+				return null;
+
+			var openTime = bounds.Min;
+
+			var candle = FirstInitCandle(subscription, new HeikinAshiCandleMessage
+			{
+				TimeFrame = timeFrame,
+				OpenTime = openTime,
+				HighTime = openTime,
+				LowTime = openTime,
+				CloseTime = openTime,
+			}, transform);
+
+			var currentCandle = subscription.CurrentCandle;
+			if (currentCandle != null)
+				candle.OpenPrice = (currentCandle.OpenPrice + currentCandle.ClosePrice) / 2M;
+
+			return candle;
+		}
+
+		/// <inheritdoc />
+		protected override bool IsCandleFinishedBeforeChange(ICandleBuilderSubscription subscription, HeikinAshiCandleMessage candle, ICandleBuilderValueTransform transform)
+		{
+			return transform.Time < candle.OpenTime || (candle.OpenTime + candle.TimeFrame) <= transform.Time;
+		}
+
+		/// <inheritdoc />
+		protected override void UpdateCandle(ICandleBuilderSubscription subscription, HeikinAshiCandleMessage candle, ICandleBuilderValueTransform transform)
+		{
+			base.UpdateCandle(subscription, candle, transform);
+
+			candle.ClosePrice = (candle.OpenPrice + candle.HighPrice + candle.LowPrice + candle.ClosePrice) / 4M;
 		}
 	}
 }

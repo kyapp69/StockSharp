@@ -23,6 +23,7 @@ namespace StockSharp.BusinessEntities
 	using System.Runtime.Serialization;
 	using System.Xml;
 	using System.Xml.Serialization;
+	using System.Runtime.CompilerServices;
 
 	using Ecng.Common;
 	using Ecng.Serialization;
@@ -65,7 +66,6 @@ namespace StockSharp.BusinessEntities
 		/// </summary>
 		public ExchangeBoard()
 		{
-			ExtensionInfo = new Dictionary<string, object>();
 		}
 
 		private string _code = string.Empty;
@@ -87,7 +87,7 @@ namespace StockSharp.BusinessEntities
 					return;
 
 				_code = value ?? throw new ArgumentNullException(nameof(value));
-				Notify(nameof(Code));
+				Notify();
 			}
 		}
 
@@ -111,7 +111,7 @@ namespace StockSharp.BusinessEntities
 					return;
 
 				_expiryTime = value;
-				Notify(nameof(ExpiryTime));
+				Notify();
 			}
 		}
 
@@ -154,7 +154,7 @@ namespace StockSharp.BusinessEntities
 		//	set
 		//	{
 		//		_isSupportAtomicReRegister = value;
-		//		Notify(nameof(IsSupportAtomicReRegister));
+		//		Notify();
 		//	}
 		//}
 
@@ -173,11 +173,11 @@ namespace StockSharp.BusinessEntities
 		//	set
 		//	{
 		//		_isSupportMarketOrders = value;
-		//		Notify(nameof(IsSupportMarketOrders));
+		//		Notify();
 		//	}
 		//}
 
-		private WorkingTime _workingTime = new WorkingTime();
+		private WorkingTime _workingTime = new WorkingTime { IsEnabled = true };
 
 		/// <summary>
 		/// Board working hours.
@@ -196,7 +196,7 @@ namespace StockSharp.BusinessEntities
 					return;
 
 				_workingTime = value ?? throw new ArgumentNullException(nameof(value));
-				Notify(nameof(WorkingTime));
+				Notify();
 			}
 		}
 
@@ -218,7 +218,7 @@ namespace StockSharp.BusinessEntities
 					return;
 
 				_timeZone = value ?? throw new ArgumentNullException(nameof(value));
-				Notify(nameof(TimeZone));
+				Notify();
 			}
 		}
 
@@ -235,33 +235,29 @@ namespace StockSharp.BusinessEntities
 		}
 
 		[field: NonSerialized]
-		private IDictionary<string, object> _extensionInfo;
+		private IDictionary<string, object> _extensionInfo = new Dictionary<string, object>();
 
-		/// <summary>
-		/// Extended exchange info.
-		/// </summary>
-		/// <remarks>
-		/// Required if additional information associated with the exchange is stored in the program.
-		/// </remarks>
+		/// <inheritdoc />
 		[XmlIgnore]
 		[Browsable(false)]
 		[DataMember]
+		[Obsolete]
 		public IDictionary<string, object> ExtensionInfo
 		{
 			get => _extensionInfo;
 			set
 			{
-				_extensionInfo = value ?? throw new ArgumentNullException(nameof(value));
-				Notify(nameof(ExtensionInfo));
+				_extensionInfo = value/* ?? throw new ArgumentNullException(nameof(value))*/;
+				Notify();
 			}
 		}
 
-		[OnDeserialized]
-		private void AfterDeserialization(StreamingContext ctx)
-		{
-			if (ExtensionInfo == null)
-				ExtensionInfo = new Dictionary<string, object>();
-		}
+		//[OnDeserialized]
+		//private void AfterDeserialization(StreamingContext ctx)
+		//{
+		//	if (ExtensionInfo == null)
+		//		ExtensionInfo = new Dictionary<string, object>();
+		//}
 
 		[field: NonSerialized]
 		private PropertyChangedEventHandler _propertyChanged;
@@ -272,15 +268,12 @@ namespace StockSharp.BusinessEntities
 			remove => _propertyChanged -= value;
 		}
 
-		private void Notify(string info)
+		private void Notify([CallerMemberName]string propertyName = null)
 		{
-			_propertyChanged?.Invoke(this, info);
+			_propertyChanged?.Invoke(this, propertyName);
 		}
 
-		/// <summary>
-		/// Returns a string that represents the current object.
-		/// </summary>
-		/// <returns>A string that represents the current object.</returns>
+		/// <inheritdoc />
 		public override string ToString()
 		{
 			return "{0} ({1})".Put(Code, Exchange);

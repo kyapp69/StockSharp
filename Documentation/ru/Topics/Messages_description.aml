@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <topic id="fcd2df04-2463-4f85-aa0c-9b7a8f95a56a" revisionNumber="1">
   <developerConceptualDocument xmlns="http://ddue.schemas.microsoft.com/authoring/2003/5" xmlns:xlink="http://www.w3.org/1999/xlink">
     <introduction>
@@ -133,7 +133,7 @@
     		<para><codeEntityReference>T:StockSharp.Messages.PortfolioMessage</codeEntityReference></para>
    		</entry>
     	<entry>
-    		<para>Содержит информацию о портфеле. Также существует сообщение <codeEntityReference>T:StockSharp.Messages.PortfolioChangeMessage</codeEntityReference> - информация об изменениях портфеля.</para>
+    		<para>Содержит информацию о портфеле.</para>
     	</entry>
   		</row>
   		
@@ -142,7 +142,7 @@
     		<para><codeEntityReference>T:StockSharp.Messages.PortfolioLookupMessage</codeEntityReference></para>
    		</entry>
     	<entry>
-    		<para>Запрашивает информацию о портфелях по заданному критерию. Результат запроса возвращается при помощи сообщения <codeEntityReference>T:StockSharp.Messages.PortfolioLookupResultMessage</codeEntityReference>.</para>
+    		<para>Запрашивает информацию о портфелях по заданному критерию. Результат запроса возвращается при помощи сообщения <codeEntityReference>T:StockSharp.Messages.PortfolioMessage</codeEntityReference>.</para>
     	</entry>
   		</row>
   		
@@ -189,13 +189,13 @@
    		</entry>
     	<entry>
     		<para>Запрашивает список инструментов по заданному критерию. Результат запроса будет возвращен при помощи сообщения
-    		<codeEntityReference>T:StockSharp.Messages.SecurityLookupResultMessage</codeEntityReference>.</para>
+    		<codeEntityReference>T:StockSharp.Messages.SecurityMessage</codeEntityReference>.</para>
     	</entry>
   		</row>
   		
   		<row>
     	<entry>
-    		<para><codeEntityReference>T:StockSharp.Messages.SessionMessage</codeEntityReference></para>
+    		<para><codeEntityReference>T:StockSharp.Messages.BoardStateMessage</codeEntityReference></para>
    		</entry>
     	<entry>
     		<para>Содержит информацию об изменении состояния торговой сессии. Доступные значения состояния сессии определены в перечислении
@@ -209,6 +209,53 @@
    		</entry>
     	<entry>
     		<para>Содержит информацию о текущем времени.</para>
+    	</entry>
+  		</row>
+
+		<row>
+    	<entry>
+    		<para><codeEntityReference>T:StockSharp.Messages.TimeFrameLookupMessage</codeEntityReference></para>
+   		</entry>
+    	<entry>
+    		<para>Запрашивает список поддерживаемых таймфреймов. Результат запроса будет возвращен при помощи сообщения
+    		<codeEntityReference>T:StockSharp.Messages.TimeFrameInfoMessage</codeEntityReference>.</para>
+    	</entry>
+  		</row>
+
+		<row>
+    	<entry>
+    		<para><codeEntityReference>T:StockSharp.Messages.TimeFrameInfoMessage</codeEntityReference></para>
+   		</entry>
+    	<entry>
+    		<para>Содержит информацию о поддерживаемых таймфреймах.</para>
+    	</entry>
+  		</row>
+
+		<row>
+    	<entry>
+    		<para><codeEntityReference>T:StockSharp.Messages.SubscriptionResponseMessage</codeEntityReference></para>
+   		</entry>
+    	<entry>
+    		<para>Ответ на запрос подписки или отписки. В случае ошибки выполнения запроса, описание ошибки заполняется
+    		<codeEntityReference>P:StockSharp.Messages.SubscriptionResponseMessage.Error</codeEntityReference>.</para>
+    	</entry>
+  		</row>
+
+		<row>
+    	<entry>
+    		<para><codeEntityReference>T:StockSharp.Messages.SubscriptionOnlineMessage</codeEntityReference></para>
+   		</entry>
+    	<entry>
+    		<para>Сообщение о переходе подписки в online состояние.</para>
+    	</entry>
+  		</row>
+
+		<row>
+    	<entry>
+    		<para><codeEntityReference>T:StockSharp.Messages.SubscriptionFinishedMessage</codeEntityReference></para>
+   		</entry>
+    	<entry>
+    		<para>Сообщение об окончании подписки в случае получения всех необходимых данных.</para>
     	</entry>
   		</row>
 	</table>

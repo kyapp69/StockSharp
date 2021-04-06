@@ -5,11 +5,11 @@ namespace StockSharp.Algo.Storages
 	using System.Globalization;
 	using System.IO;
 	using System.Linq;
+	using System.Runtime.CompilerServices;
 	using System.Text;
 
 	using Ecng.Collections;
 	using Ecng.Common;
-	using Ecng.Reflection;
 	using Ecng.Serialization;
 
 	using StockSharp.Logging;
@@ -32,7 +32,7 @@ namespace StockSharp.Algo.Storages
 		IDictionary<string, Exception> Init();
 
 		/// <summary>
-		/// Get native security identifiers for storage. 
+		/// Get native security identifiers for storage.
 		/// </summary>
 		/// <param name="storageName">Storage name.</param>
 		/// <returns>Security identifiers.</returns>
@@ -63,6 +63,30 @@ namespace StockSharp.Algo.Storages
 		/// <param name="securityId">Security identifier.</param>
 		/// <returns>Native (internal) trading system security id.</returns>
 		object TryGetBySecurityId(string storageName, SecurityId securityId);
+
+		/// <summary>
+		/// Clear storage.
+		/// </summary>
+		/// <param name="storageName">Storage name.</param>
+		void Clear(string storageName);
+
+		/// <summary>
+		///
+		/// </summary>
+		/// <param name="storageName"></param>
+		/// <param name="securityId"></param>
+		/// <param name="isPersistable">Save the identifier as a permanent.</param>
+		/// <returns></returns>
+		bool RemoveBySecurityId(string storageName, SecurityId securityId, bool isPersistable = true);
+
+		/// <summary>
+		///
+		/// </summary>
+		/// <param name="storageName"></param>
+		/// <param name="nativeId">Native (internal) trading system security id.</param>
+		/// <param name="isPersistable">Save the identifier as a permanent.</param>
+		/// <returns></returns>
+		bool RemoveByNativeId(string storageName, object nativeId, bool isPersistable = true);
 	}
 
 	/// <summary>
@@ -71,6 +95,7 @@ namespace StockSharp.Algo.Storages
 	public sealed class CsvNativeIdStorage : INativeIdStorage
 	{
 		private readonly INativeIdStorage _inMemory = new InMemoryNativeIdStorage();
+		private readonly SynchronizedDictionary<SecurityId, object> _buffer = new SynchronizedDictionary<SecurityId, object>();
 
 		private readonly string _path;
 
@@ -104,14 +129,11 @@ namespace StockSharp.Algo.Storages
 		/// <inheritdoc />
 		public IDictionary<string, Exception> Init()
 		{
-			if (!Directory.Exists(_path))
-				Directory.CreateDirectory(_path);
+			Directory.CreateDirectory(_path);
 
-			_inMemory.Init();
+			var errors = _inMemory.Init();
 
 			var files = Directory.GetFiles(_path, "*.csv");
-
-			var errors = new Dictionary<string, Exception>();
 
 			foreach (var fileName in files)
 			{
@@ -151,6 +173,67 @@ namespace StockSharp.Algo.Storages
 		}
 
 		/// <inheritdoc />
+		public void Clear(string storageName)
+		{
+			_inMemory.Clear(storageName);
+			_buffer.Clear();
+			DelayAction.DefaultGroup.Add(() => File.Delete(GetFileName(storageName)));
+		}
+
+		/// <inheritdoc />
+		public bool RemoveBySecurityId(string storageName, SecurityId securityId, bool isPersistable)
+		{
+			var added = _inMemory.RemoveBySecurityId(storageName, securityId, isPersistable);
+
+			if (!added)
+				return false;
+
+			if (isPersistable)
+				SaveAll(storageName);
+
+			return true;
+		}
+
+		/// <inheritdoc />
+		public bool RemoveByNativeId(string storageName, object nativeId, bool isPersistable)
+		{
+			var added = _inMemory.RemoveByNativeId(storageName, nativeId, isPersistable);
+
+			if (!added)
+				return false;
+
+			if (isPersistable)
+				SaveAll(storageName);
+
+			return true;
+		}
+
+		private void SaveAll(string storageName)
+		{
+			_buffer.Clear();
+
+			DelayAction.DefaultGroup.Add(() =>
+			{
+				var fileName = GetFileName(storageName);
+
+				File.Delete(fileName);
+
+				var items = _inMemory.Get(storageName);
+
+				if (items.Length == 0)
+					return;
+
+				using (var writer = new CsvFileWriter(new TransactionFileStream(fileName, FileMode.Append)))
+				{
+					WriteHeader(writer, items.FirstOrDefault().Item2);
+
+					foreach (var item in items)
+						WriteItem(writer, item.Item1, item.Item2);
+				}
+			});
+		}
+
+		/// <inheritdoc />
 		public SecurityId? TryGetByNativeId(string storageName, object nativeId)
 		{
 			return _inMemory.TryGetByNativeId(storageName, nativeId);
@@ -162,68 +245,79 @@ namespace StockSharp.Algo.Storages
 			return _inMemory.TryGetBySecurityId(storageName, securityId);
 		}
 
+		private void WriteHeader(CsvFileWriter writer, object nativeId)
+		{
+			var tupleValues = nativeId.TryTupleToValues();
+
+			if (tupleValues != null)
+			{
+				writer.WriteRow(new[]
+				{
+					"Symbol",
+					"Board",
+				}.Concat(tupleValues.Select(v => GetTypeName(v.GetType()))));
+			}
+			else
+			{
+				writer.WriteRow(new[]
+				{
+					"Symbol",
+					"Board",
+					GetTypeName(nativeId.GetType()),
+				});
+			}
+		}
+
+		private void WriteItem(CsvFileWriter writer, SecurityId securityId, object nativeId)
+		{
+			var tupleValues = nativeId.TryTupleToValues();
+
+			if (tupleValues != null)
+			{
+				writer.WriteRow(new[]
+				{
+					securityId.SecurityCode,
+					securityId.BoardCode
+				}.Concat(tupleValues.Select(v => v.To<string>())));
+			}
+			else
+			{
+				writer.WriteRow(new[]
+				{
+					securityId.SecurityCode,
+					securityId.BoardCode,
+					nativeId.ToString()
+				});
+			}
+		}
+
 		private void Save(string storageName, SecurityId securityId, object nativeId)
 		{
+			_buffer[securityId] = nativeId;
+
 			DelayAction.DefaultGroup.Add(() =>
 			{
-				var fileName = Path.Combine(_path, storageName + ".csv");
+				var items = _buffer.SyncGet(c => c.CopyAndClear());
+
+				if (items.Length == 0)
+					return;
+
+				var fileName = GetFileName(storageName);
 
 				var appendHeader = !File.Exists(fileName) || new FileInfo(fileName).Length == 0;
 
 				using (var writer = new CsvFileWriter(new TransactionFileStream(fileName, FileMode.Append)))
 				{
-					var nativeIdType = nativeId.GetType();
-					var typleType = nativeIdType.GetGenericType(typeof(Tuple<,>));
-
 					if (appendHeader)
-					{
-						if (typleType == null)
-						{
-							writer.WriteRow(new[]
-							{
-								"Symbol",
-								"Board",
-								GetTypeName(nativeIdType),
-							});
-						}
-						else
-						{
-							dynamic tuple = nativeId;
+						WriteHeader(writer, nativeId);
 
-							writer.WriteRow(new[]
-							{
-								"Symbol",
-								"Board",
-								GetTypeName((Type)tuple.Item1.GetType()),
-								GetTypeName((Type)tuple.Item2.GetType()),
-							});
-						}
-					}
-
-					if (typleType == null)
-					{
-						writer.WriteRow(new[]
-						{
-							securityId.SecurityCode,
-							securityId.BoardCode,
-							nativeId.ToString()
-						});
-					}
-					else
-					{
-						dynamic tuple = nativeId;
-
-						writer.WriteRow(new[]
-						{
-							securityId.SecurityCode,
-							securityId.BoardCode,
-							(string)tuple.Item1.ToString(),
-							(string)tuple.Item2.ToString()
-						});
-					}
+					foreach (var item in items)
+						WriteItem(writer, item.Key, item.Value);
 				}
 			});
 		}
+
+		private string GetFileName(string storageName) => Path.Combine(_path, storageName + ".csv");
 
 		private static string GetTypeName(Type nativeIdType)
 		{
@@ -248,10 +342,12 @@ namespace StockSharp.Algo.Storages
 					reader.NextLine();
 					reader.Skip(2);
 
-					var type1 = reader.ReadString().To<Type>();
-					var type2 = reader.ReadString().To<Type>();
+					var types = new List<Type>();
 
-					var isTuple = type2 != null;
+					while ((reader.ColumnCurr + 1) < reader.ColumnCount)
+						types.Add(reader.ReadString().To<Type>());
+
+					var isTuple = types.Count > 1;
 
 					while (reader.NextLine())
 					{
@@ -261,14 +357,20 @@ namespace StockSharp.Algo.Storages
 							BoardCode = reader.ReadString()
 						};
 
-						var nativeId = reader.ReadString().To(type1);
+						object nativeId;
 
 						if (isTuple)
 						{
-							var nativeId2 = reader.ReadString().To(type2);
-							nativeId = typeof(Tuple<,>).MakeGenericType(type1, type2).CreateInstance(new[] { nativeId, nativeId2 });
+							var args = new List<object>();
+
+							for (var i = 0; i < types.Count; i++)
+								args.Add(reader.ReadString().To(types[i]));
+
+							nativeId = args.ToTuple();
 						}
-						
+						else
+							nativeId = reader.ReadString().To(types[0]);
+
 						pairs.Add(Tuple.Create(securityId, nativeId));
 					}
 				}
@@ -311,9 +413,16 @@ namespace StockSharp.Algo.Storages
 			{
 				var dict = _nativeIds.SafeAdd(storageName);
 
-				foreach (var id in ids)
+				foreach (var tuple in ids)
 				{
-					dict.Add(id.Item1, id.Item2);
+					var secId = tuple.Item1;
+					var nativeId = tuple.Item2;
+
+					// skip duplicates
+					if (dict.ContainsKey(secId) || dict.ContainsValue(nativeId))
+						continue;
+
+					dict.Add(secId, nativeId);
 				}
 			}
 		}
@@ -348,6 +457,15 @@ namespace StockSharp.Algo.Storages
 				return _nativeIds.TryGetValue(storageName)?.TryGetValue(securityId);
 		}
 
+		void INativeIdStorage.Clear(string storageName)
+		{
+			if (storageName.IsEmpty())
+				throw new ArgumentNullException(nameof(storageName));
+
+			lock (_syncRoot)
+				_nativeIds.Remove(storageName);
+		}
+
 		SecurityId? INativeIdStorage.TryGetByNativeId(string storageName, object nativeId)
 		{
 			if (storageName.IsEmpty())
@@ -371,6 +489,38 @@ namespace StockSharp.Algo.Storages
 
 			lock (_syncRoot)
 				return _nativeIds.TryGetValue(storageName)?.Select(p => Tuple.Create(p.Key, p.Value)).ToArray() ?? ArrayHelper.Empty<Tuple<SecurityId, object>>();
+		}
+
+		bool INativeIdStorage.RemoveBySecurityId(string storageName, SecurityId securityId, bool isPersistable)
+		{
+			if (storageName.IsEmpty())
+				throw new ArgumentNullException(nameof(storageName));
+
+			lock (_syncRoot)
+			{
+				var set = _nativeIds.TryGetValue(storageName);
+
+				if (set == null)
+					return false;
+
+				return set.Remove(securityId);
+			}
+		}
+
+		bool INativeIdStorage.RemoveByNativeId(string storageName, object nativeId, bool isPersistable)
+		{
+			if (storageName.IsEmpty())
+				throw new ArgumentNullException(nameof(storageName));
+
+			lock (_syncRoot)
+			{
+				var set = _nativeIds.TryGetValue(storageName);
+
+				if (set == null)
+					return false;
+
+				return set.RemoveByValue(nativeId);
+			}
 		}
 	}
 }

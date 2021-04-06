@@ -1,30 +1,17 @@
-#region S# License
-/******************************************************************************************
-NOTICE!!!  This program and source code is owned and licensed by
-StockSharp, LLC, www.stocksharp.com
-Viewing or use of this code requires your acceptance of the license
-agreement found at https://github.com/StockSharp/StockSharp/blob/master/LICENSE
-Removal of this comment is a violation of the license agreement.
-
-Project: StockSharp.Messages.Messages
-File: ChangePasswordMessage.cs
-Created: 2015, 11, 11, 2:32 PM
-
-Copyright 2010 by StockSharp, LLC
-*******************************************************************************************/
-#endregion S# License
 namespace StockSharp.Messages
 {
 	using System;
 	using System.Runtime.Serialization;
 	using System.Security;
+	using System.Xml.Serialization;
 
 	/// <summary>
 	/// Change password message.
 	/// </summary>
 	[DataContract]
 	[Serializable]
-	public class ChangePasswordMessage : Message
+	public class ChangePasswordMessage :
+		BaseResultMessage<ChangePasswordMessage>, ITransactionIdMessage, IErrorMessage
 	{
 		/// <summary>
 		/// Initialize <see cref="ChangePasswordMessage"/>.
@@ -43,44 +30,68 @@ namespace StockSharp.Messages
 		{
 		}
 
-		/// <summary>
-		/// Request identifier.
-		/// </summary>
+		/// <inheritdoc />
 		[DataMember]
 		public long TransactionId { get; set; }
 
-		/// <summary>
-		/// ID of the original message <see cref="TransactionId"/> for which this message is a response.
-		/// </summary>
+		/// <inheritdoc />
 		[DataMember]
-		public long OriginalTransactionId { get; set; }
+		[XmlIgnore]
+		public Exception Error { get; set; }
+
+		[field: NonSerialized]
+		private SecureString _newPassword;
 
 		/// <summary>
 		/// New password.
 		/// </summary>
 		[DataMember]
-		public SecureString NewPassword { get; set; }
+		public SecureString NewPassword
+		{
+			get => _newPassword;
+			set => _newPassword = value;
+		}
 
 		/// <summary>
-		/// Change password error info.
+		/// User name.
 		/// </summary>
 		[DataMember]
-		public Exception Error { get; set; }
+		public string UserName { get; set; }
+
+		[field: NonSerialized]
+		private SecureString _oldPassword;
 
 		/// <summary>
-		/// Create a copy of <see cref="ChangePasswordMessage"/>.
+		/// Old password.
 		/// </summary>
-		/// <returns>Copy.</returns>
-		public override Message Clone()
+		[DataMember]
+		public SecureString OldPassword
 		{
-			return new ChangePasswordMessage
-			{
-				TransactionId = TransactionId,
-				OriginalTransactionId = OriginalTransactionId,
-				LocalTime = LocalTime,
-				NewPassword = NewPassword,
-				Error = Error,
-			};
+			get => _oldPassword;
+			set => _oldPassword = value;
+		}
+
+		/// <inheritdoc />
+		protected override void CopyTo(ChangePasswordMessage destination)
+		{
+			base.CopyTo(destination);
+
+			destination.TransactionId = TransactionId;
+			destination.UserName = UserName;
+			destination.OldPassword = OldPassword;
+			destination.NewPassword = NewPassword;
+			destination.Error = Error;
+		}
+
+		/// <inheritdoc />
+		public override string ToString()
+		{
+			var str = base.ToString();
+
+			if (Error != null)
+				str += $",Error={Error.Message}";
+
+			return str;
 		}
 	}
 }

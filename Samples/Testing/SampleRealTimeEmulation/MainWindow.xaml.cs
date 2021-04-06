@@ -24,6 +24,7 @@ namespace SampleRealTimeEmulation
 	using Ecng.Common;
 	using Ecng.Serialization;
 	using Ecng.Xaml;
+	using Ecng.Configuration;
 
 	using StockSharp.Algo;
 	using StockSharp.Algo.Candles;
@@ -41,8 +42,7 @@ namespace SampleRealTimeEmulation
 		private readonly SynchronizedList<Candle> _buffer = new SynchronizedList<Candle>();
 		private readonly ChartCandleElement _candlesElem;
 		private readonly LogManager _logManager;
-		private CandleManager _candleManager;
-		private CandleSeries _candleSeries;
+		private Subscription _candlesSubscription;
 		private readonly Connector _realConnector = new Connector();
 		private RealTimeEmulationTrader<IMessageAdapter> _emuConnector;
 		private bool _isConnected;
@@ -51,11 +51,7 @@ namespace SampleRealTimeEmulation
 
 		private const string _settingsFile = "connection.xml";
 
-		private readonly Portfolio _emuPf = new Portfolio
-		{
-			Name = LocalizedStrings.Str1209,
-			BeginValue = 1000000
-		};
+		private readonly Portfolio _emuPf = Portfolio.CreateSimulator();
 
 		public MainWindow()
 		{
@@ -87,15 +83,6 @@ namespace SampleRealTimeEmulation
 
 		private void InitRealConnector()
 		{
-			try
-			{
-				if (File.Exists(_settingsFile))
-					_realConnector.Load(new XmlSerializer<SettingsStorage>().Deserialize(_settingsFile));
-			}
-			catch
-			{
-			}
-
 			_realConnector.NewOrder += OrderGrid.Orders.Add;
 			_realConnector.NewMyTrade += TradeGrid.Trades.Add;
 			_realConnector.OrderRegisterFailed += OrderGrid.AddRegistrationFail;
@@ -103,8 +90,27 @@ namespace SampleRealTimeEmulation
 			_realConnector.MassOrderCancelFailed += (transId, error) =>
 				this.GuiAsync(() => MessageBox.Show(this, error.ToString(), LocalizedStrings.Str716));
 
-			_realConnector.Error += error =>
-				this.GuiAsync(() => MessageBox.Show(this, error.ToString(), LocalizedStrings.Str2955));
+			//_realConnector.Error += error =>
+			//	this.GuiAsync(() => MessageBox.Show(this, error.ToString(), LocalizedStrings.Str2955));
+
+			ConfigManager.RegisterService<IMessageAdapterProvider>(new FullInMemoryMessageAdapterProvider(_realConnector.Adapter.InnerAdapters));
+
+			try
+			{
+				if (File.Exists(_settingsFile))
+				{
+					var ctx = new ContinueOnExceptionContext();
+					ctx.Error += ex => ex.LogError();
+
+					using (ctx.ToScope())
+						_realConnector.Load(new XmlSerializer<SettingsStorage>().Deserialize(_settingsFile));
+				}
+			}
+			catch
+			{
+			}
+
+			SecurityPicker.SecurityProvider = new FilterableSecurityProvider(_realConnector);
 		}
 
 		private void InitEmuConnector()
@@ -115,16 +121,14 @@ namespace SampleRealTimeEmulation
 				_logManager.Sources.Remove(_emuConnector);
 			}
 
-			_emuConnector = new RealTimeEmulationTrader<IMessageAdapter>(_realConnector.MarketDataAdapter ?? new PassThroughMessageAdapter(new IncrementalIdGenerator()), _emuPf, false);
+			_emuConnector = new RealTimeEmulationTrader<IMessageAdapter>(_realConnector.Adapter, _realConnector, _emuPf, false);
 			_logManager.Sources.Add(_emuConnector);
 
-			_emuConnector.EmulationAdapter.Emulator.Settings.TimeZone = TimeHelper.Est;
-			_emuConnector.EmulationAdapter.Emulator.Settings.ConvertTime = true;
+			var settings = _emuConnector.EmulationAdapter.Emulator.Settings;
+			settings.TimeZone = TimeHelper.Est;
+			settings.ConvertTime = true;
 
-			SecurityPicker.SecurityProvider = new FilterableSecurityProvider(_emuConnector);
 			SecurityPicker.MarketDataProvider = _emuConnector;
-
-			_candleManager = new CandleManager(_emuConnector);
 
 			// subscribe on connection successfully event
 			_emuConnector.Connected += () =>
@@ -146,14 +150,12 @@ namespace SampleRealTimeEmulation
 				// update gui labels
 				ChangeConnectStatus(false);
 
-				MessageBox.Show(this, error.ToString(), LocalizedStrings.Str2959);
+				//MessageBox.Show(this, error.ToString(), LocalizedStrings.Str2959);
 			});
 
-			_emuConnector.NewMarketDepth += OnDepth;
-			_emuConnector.MarketDepthChanged += OnDepth;
+			_emuConnector.OrderBookReceived += OnDepth;
 
-			_emuConnector.NewPortfolio += PortfolioGrid.Portfolios.Add;
-			_emuConnector.NewPosition += PortfolioGrid.Positions.Add;
+			_emuConnector.PositionReceived += (sub, p) => PortfolioGrid.Positions.TryAdd(p);
 
 			_emuConnector.NewOrder += OrderGrid.Orders.Add;
 			_emuConnector.NewMyTrade += TradeGrid.Trades.Add;
@@ -161,9 +163,9 @@ namespace SampleRealTimeEmulation
 			// subscribe on error of order registration event
 			_emuConnector.OrderRegisterFailed += OrderGrid.AddRegistrationFail;
 
-			_candleManager.Processing += (s, candle) =>
+			_emuConnector.CandleReceived += (s, candle) =>
 			{
-				if (candle.State == CandleStates.Finished)
+				if (s == _candlesSubscription)
 					_buffer.Add(candle);
 			};
 
@@ -171,8 +173,8 @@ namespace SampleRealTimeEmulation
 				this.GuiAsync(() => MessageBox.Show(this, error.ToString(), LocalizedStrings.Str716));
 
 			// subscribe on error event
-			_emuConnector.Error += error =>
-				this.GuiAsync(() => MessageBox.Show(this, error.ToString(), LocalizedStrings.Str2955));
+			//_emuConnector.Error += error =>
+			//	this.GuiAsync(() => MessageBox.Show(this, error.ToString(), LocalizedStrings.Str2955));
 
 			// subscribe on error of market data subscription event
 			_emuConnector.MarketDataSubscriptionFailed += (security, msg, error) =>
@@ -180,13 +182,13 @@ namespace SampleRealTimeEmulation
 				if (error == null)
 					return;
 
-				this.GuiAsync(() => MessageBox.Show(this, error.ToString(), LocalizedStrings.Str2956Params.Put(msg.DataType, security)));
+				this.GuiAsync(() => MessageBox.Show(this, error.ToString(), LocalizedStrings.Str2956Params.Put(msg.DataType2, security)));
 			};
 		}
 
 		private void CandleSettingsChanged()
 		{
-			if (_tempCandleSeries == CandleSettingsEditor.Settings || _candleSeries == null)
+			if (_tempCandleSeries == CandleSettingsEditor.Settings || _candlesSubscription == null)
 				return;
 
 			_tempCandleSeries = CandleSettingsEditor.Settings.Clone();
@@ -195,8 +197,8 @@ namespace SampleRealTimeEmulation
 
 		protected override void OnClosing(CancelEventArgs e)
 		{
-			_realConnector?.Dispose();
-			_emuConnector?.Dispose();
+			_realConnector?.Disconnect();
+			_emuConnector?.Disconnect();
 
 			base.OnClosing(e);
 		}
@@ -225,12 +227,12 @@ namespace SampleRealTimeEmulation
 			}
 		}
 
-		private void OnDepth(MarketDepth depth)
+		private void OnDepth(Subscription subscription, QuoteChangeMessage depth)
 		{
-			if (depth.Security != _security)
+			if (depth.SecurityId != _security.ToSecurityId())
 				return;
 
-			DepthControl.UpdateDepth(depth);
+			DepthControl.UpdateDepth(depth, _security);
 		}
 
 		private void ChangeConnectStatus(bool isConnected)
@@ -255,19 +257,18 @@ namespace SampleRealTimeEmulation
 			if (security == null)
 				return;
 
-			if (_candleSeries != null)
-				_candleManager.Stop(_candleSeries); // give back series memory
+			if (_candlesSubscription != null)
+				_emuConnector.UnSubscribe(_candlesSubscription); // give back series memory
 
 			_security = security;
 
 			Chart.Reset(new[] { _candlesElem });
 
-			_emuConnector.RegisterMarketDepth(security);
-			_emuConnector.RegisterTrades(security);
-			_emuConnector.RegisterSecurity(security);
+			_emuConnector.SubscribeMarketDepth(security);
+			_emuConnector.SubscribeTrades(security);
+			_emuConnector.SubscribeLevel1(security);
 
-			_candleSeries = new CandleSeries(CandleSettingsEditor.Settings.CandleType, security, CandleSettingsEditor.Settings.Arg);
-			_candleManager.Start(_candleSeries);
+			_candlesSubscription = _emuConnector.SubscribeCandles(new CandleSeries(CandleSettingsEditor.Settings.CandleType, security, CandleSettingsEditor.Settings.Arg), from: DateTimeOffset.UtcNow - TimeSpan.FromDays(10));
 		}
 
 		private void NewOrder_OnClick(object sender, RoutedEventArgs e)
@@ -335,14 +336,14 @@ namespace SampleRealTimeEmulation
 		{
 			var wnd = new SecurityLookupWindow
 			{
-				ShowAllOption = _emuConnector.MarketDataAdapter.IsSupportSecuritiesLookupAll,
+				ShowAllOption = _emuConnector.MarketDataAdapter.IsSupportSecuritiesLookupAll(),
 				Criteria = new Security { Code = "AAPL" }
 			};
 
 			if (!wnd.ShowModal(this))
 				return;
 
-			_emuConnector.LookupSecurities(wnd.Criteria);
+			_emuConnector.LookupSecurities(wnd.CriteriaMessage);
 		}
 	}
 }

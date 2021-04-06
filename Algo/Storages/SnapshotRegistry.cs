@@ -38,7 +38,7 @@ namespace StockSharp.Algo.Storages
 		}
 
 		private class SnapshotStorage<TKey, TMessage> : SnapshotStorage, ISnapshotStorage<TKey, TMessage>
-			where TMessage : Message
+			where TMessage : Message, ISecurityIdMessage
 		{
 			private class SnapshotStorageDate
 			{
@@ -69,38 +69,58 @@ namespace StockSharp.Algo.Storages
 					{
 						Debug.WriteLine($"Snapshot (Load): {_fileName}");
 
-						using (var stream = File.OpenRead(_fileName))
+						try
 						{
-							_version = new Version(stream.ReadByte(), stream.ReadByte());
+							var allError = true;
 
-							while (stream.Position < stream.Length)
+							using (var stream = File.OpenRead(_fileName))
 							{
-								var size = stream.Read<int>();
+								_version = new Version(stream.ReadByte(), stream.ReadByte());
 
-								var buffer = new byte[size];
-								stream.ReadBytes(buffer, buffer.Length);
+								if (_version > _serializer.Version)
+									new InvalidOperationException(LocalizedStrings.StorageVersionNewerKey.Put(_fileName, _version, _serializer.Version)).LogError();
 
-								//var offset = stream.Position;
-
-								TMessage message;
-
-								try
+								while (stream.Position < stream.Length)
 								{
-									message = _serializer.Deserialize(_version, buffer);
-								}
-								catch (Exception ex)
-								{
-									ex.LogError();
-									continue;
+									var size = stream.Read<int>();
+
+									var buffer = new byte[size];
+									stream.ReadBytes(buffer, buffer.Length);
+
+									//var offset = stream.Position;
+
+									TMessage message;
+
+									try
+									{
+										message = _serializer.Deserialize(_version, buffer);
+										allError = false;
+									}
+									catch (Exception ex)
+									{
+										ex.LogError();
+										continue;
+									}
+
+									var key = _serializer.GetKey(message);
+
+									_snapshots.Add(key, message);
+									_buffers.Add(key, buffer);
 								}
 
-								var key = _serializer.GetKey(message);
-
-								_snapshots.Add(key, message);
-								_buffers.Add(key, buffer);
+								//_currOffset = stream.Length;
 							}
 
-							//_currOffset = stream.Length;
+							if (allError)
+							{
+								File.Delete(_fileName);
+							}
+						}
+						catch (Exception ex)
+						{
+							Debug.WriteLine($"Snapshot (ERROR): {ex.Message}");
+							ex.LogError();
+							File.Delete(_fileName);
 						}
 					}
 					else
@@ -133,7 +153,7 @@ namespace StockSharp.Algo.Storages
 
 				public void Update(TMessage curr)
 				{
-					if (curr == null)
+					if (curr is null)
 						throw new ArgumentNullException(nameof(curr));
 
 					var key = _serializer.GetKey(curr);
@@ -142,9 +162,15 @@ namespace StockSharp.Algo.Storages
 					{
 						var prev = _snapshots.TryGetValue(key);
 
-						if (prev == null)
+						if (prev is null)
 						{
-							_snapshots.Add(key, _serializer.CreateCopy(curr));
+							if (curr is ExecutionMessage execMsg && execMsg.OrderState == OrderStates.Failed)
+								return;
+
+							if (curr.SecurityId == default)
+								throw new ArgumentException(curr.ToString());
+
+							_snapshots.Add(key, curr.TypedClone());
 						}
 						else
 						{
@@ -179,7 +205,7 @@ namespace StockSharp.Algo.Storages
 								return false;
 
 							return true;
-						}).Select(m => (TMessage)m.Clone()).ToArray();
+						}).Select(m => m.TypedClone()).ToArray();
 					}
 				}
 
@@ -216,14 +242,14 @@ namespace StockSharp.Algo.Storages
 
 					Debug.WriteLine($"Snapshot (Save): {_fileName}");
 
-					using (var stream = new FileStream(_fileName, FileMode.Create, FileAccess.Write))
+					using (var stream = new TransactionFileStream(_fileName, FileMode.Create))
 					{
 						stream.WriteByte((byte)_version.Major);
 						stream.WriteByte((byte)_version.Minor);
 
 						foreach (var buffer in buffers)
 						{
-							stream.Write(buffer);
+							stream.WriteEx(buffer);
 						}
 					}
 				}
@@ -232,6 +258,8 @@ namespace StockSharp.Algo.Storages
 			private readonly string _path;
 			private readonly string _fileNameWithExtension;
 			private readonly string _datesPath;
+
+			private bool _flushDates;
 
 			private readonly SyncObject _cacheSync = new SyncObject();
 
@@ -261,7 +289,7 @@ namespace StockSharp.Algo.Storages
 					}
 					else
 					{
-						var dates = InteropHelper
+						var dates = IOHelper
 						            .GetDirectories(_path)
 						            .Where(dir => File.Exists(Path.Combine(dir, _fileNameWithExtension)))
 						            .Select(dir => LocalMarketDataDrive.GetDate(Path.GetFileName(dir)));
@@ -319,11 +347,14 @@ namespace StockSharp.Algo.Storages
 
 				if (date.IsDefault())
 					throw new ArgumentException(message.ToString());
-				
+
 				GetStorageDate(date).Update(curr);
 
-				if (DatesDict.TryAdd(date, date))
-					SaveDates(DatesDict.CachedValues);
+				lock (DatesDict.SyncRoot)
+				{
+					if (DatesDict.TryAdd2(date, date))
+						_flushDates = true;
+				}
 			}
 
 			TMessage ISnapshotStorage<TKey, TMessage>.Get(TKey key)
@@ -428,7 +459,7 @@ namespace StockSharp.Algo.Storages
 							writer.WriteLine(LocalMarketDataDrive.GetDirName(date));
 						}
 					});
-					
+
 					lock (_cacheSync)
 					{
 						stream.Position = 0;
@@ -437,7 +468,7 @@ namespace StockSharp.Algo.Storages
 				}
 				catch (UnauthorizedAccessException)
 				{
-					// если папка с данными с правами только на чтение
+					// РµСЃР»Рё РїР°РїРєР° СЃ РґР°РЅРЅС‹РјРё СЃ РїСЂР°РІР°РјРё С‚РѕР»СЊРєРѕ РЅР° С‡С‚РµРЅРёРµ
 				}
 			}
 
@@ -461,6 +492,24 @@ namespace StockSharp.Algo.Storages
 						errors.Add(ex);
 					}
 				});
+
+				var saveDates = false;
+
+				try
+				{
+					lock (DatesDict.SyncRoot)
+					{
+						if (_flushDates)
+							saveDates = true;
+					}
+
+					if (saveDates)
+						SaveDates(DatesDict.CachedValues);
+				}
+				catch (Exception ex)
+				{
+					errors.Add(ex);
+				}
 
 				return errors;
 			}
@@ -547,7 +596,7 @@ namespace StockSharp.Algo.Storages
 				else if (dataType == typeof(QuoteChangeMessage))
 					storage = new SnapshotStorage<SecurityId, QuoteChangeMessage>(_path, new QuotesBinarySnapshotSerializer());
 				else if (dataType == typeof(PositionChangeMessage))
-					storage = new SnapshotStorage<SecurityId, PositionChangeMessage>(_path, new PositionBinarySnapshotSerializer());
+					storage = new SnapshotStorage<Tuple<SecurityId, string, string>, PositionChangeMessage>(_path, new PositionBinarySnapshotSerializer());
 				else if (dataType == typeof(ExecutionMessage))
 				{
 					switch ((ExecutionTypes)arg)

@@ -24,7 +24,7 @@ namespace StockSharp.Algo.Candles.Compression
 		}
 
 		/// <inheritdoc />
-		public override void SendInMessage(Message message)
+		protected override bool OnSendInMessage(Message message)
 		{
 			switch (message.Type)
 			{
@@ -43,56 +43,31 @@ namespace StockSharp.Algo.Candles.Compression
 						break;
 					}
 
-					switch (mdMsg.DataType)
+					if (mdMsg.DataType2.IsCandles)
 					{
-						case MarketDataTypes.CandleTimeFrame:
-						case MarketDataTypes.CandleTick:
-						case MarketDataTypes.CandleVolume:
-						case MarketDataTypes.CandleRange:
-						case MarketDataTypes.CandlePnF:
-						case MarketDataTypes.CandleRenko:
-						{
-							var info = _infos.SafeAdd(mdMsg.TransactionId, k => mdMsg.DataType.ToCandleMessage().CreateInstance<CandleMessage>());
-							info.SecurityId = mdMsg.SecurityId;
-							info.Arg = mdMsg.Arg;
-							break;
-						}
+						var info = _infos.SafeAdd(mdMsg.TransactionId, k => mdMsg.DataType2.MessageType.CreateInstance<CandleMessage>());
+						info.SecurityId = mdMsg.SecurityId;
+						info.Arg = mdMsg.GetArg();
 					}
 
 					break;
 				}
 			}
 
-			base.SendInMessage(message);
+			return base.OnSendInMessage(message);
 		}
 
 		/// <inheritdoc />
 		protected override void OnInnerAdapterNewOutMessage(Message message)
 		{
-			if (message.IsBack)
+			switch (message)
 			{
-				base.OnInnerAdapterNewOutMessage(message);
-				return;
-			}
-
-			switch (message.Type)
-			{
-				case MessageTypes.CandleTimeFrame:
-				case MessageTypes.CandlePnF:
-				case MessageTypes.CandleRange:
-				case MessageTypes.CandleRenko:
-				case MessageTypes.CandleTick:
-				case MessageTypes.CandleVolume:
-				{
-					ProcessCandle((CandleMessage)message);
+				case CandleMessage candleMsg:
+					ProcessCandle(candleMsg);
 					break;
-				}
-
-				case MessageTypes.MarketDataFinished:
-				{
-					_infos.Remove(((MarketDataFinishedMessage)message).OriginalTransactionId);
+				case SubscriptionFinishedMessage finishedMsg:
+					_infos.Remove(finishedMsg.OriginalTransactionId);
 					break;
-				}
 			}
 
 			base.OnInnerAdapterNewOutMessage(message);
@@ -105,7 +80,7 @@ namespace StockSharp.Algo.Candles.Compression
 			if (info == null)
 				return;
 
-			if (info.SecurityId == default(SecurityId))
+			if (info.SecurityId == default)
 				info.SecurityId = message.SecurityId;
 			else
 				message.SecurityId = info.SecurityId;
@@ -180,7 +155,7 @@ namespace StockSharp.Algo.Candles.Compression
 			var currentValue = getValue(current);
 			var fromValue = getValue(from);
 
-			if (currentValue == default(DateTimeOffset) && fromValue != default(DateTimeOffset))
+			if (currentValue == default && fromValue != default)
 				setValue(current, fromValue);
 			else
 				setValue(from, currentValue);
@@ -192,7 +167,7 @@ namespace StockSharp.Algo.Candles.Compression
 		/// <returns>Copy.</returns>
 		public override IMessageChannel Clone()
 		{
-			return new CandleHolderMessageAdapter(InnerAdapter);
+			return new CandleHolderMessageAdapter(InnerAdapter.TypedClone());
 		}
 	}
 }
